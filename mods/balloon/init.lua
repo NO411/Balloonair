@@ -1,6 +1,9 @@
 local minetest, math, vector, pairs = minetest, math, vector, pairs
 local modname = minetest.get_current_modname()
 local modpath = minetest.get_modpath(modname)
+
+minetest.settings:set("time_speed", 0)
+
 local prefix = modname .. ":"
 local colors = {
         "D1B187",
@@ -191,7 +194,23 @@ local function set_random_sky(player)
         })
 end
 
+local timers = {
+        environment = 0,
+        balloon = 0,
+        score = 0,
+}
+
 -- player
+local players = {}
+
+local function p_get(p, v)
+        return players[p][v]
+end
+
+local function p_set(p, v, n)
+        players[p][v] = n
+end
+
 local function set_environment(player)
         player:hud_set_flags({
                 --hotbar = false,
@@ -211,16 +230,75 @@ local function set_environment(player)
         player:set_stars({
                 count = 500,
         })
+        player:set_eye_offset(vector.new(0, 5, -60))
+        --player:set_look_horizontal(0)
         set_random_sky(player)
         player:set_properties({
                 textures = {"blank.png"},
         })
+        player:override_day_night_ratio(0.7)
 end
 
-local timers = {
-        environment = 0,
-        balloon = 0,
-}
+local function get_status(player)
+        return players[player].status
+end
+
+local function set_status(player, status)
+        players[player].status = status
+end
+
+local function reset_pos(obj)
+        obj:set_pos(vector.new(0, 100, 0))
+        obj:set_velocity(vector.new(0, 0, 0))
+end
+
+
+local function add_paused_screen(player)
+        players[player].hud.paused = player:hud_add({
+                hud_elem_type = "text",
+                position = {x = 0.5, y = 0.5},
+                text = "Press JUMP to start",
+                number = 0x4B726E,
+                size = {x = 2, y = 2},
+                z_index = 0,
+                style = 1,
+        })
+end
+
+local function set_highscore(player)
+        local score = p_get(player, "score")
+        if score > p_get(player, "highscore") then
+               p_set(player, "highscore", score)
+        end
+        p_set(player, "score", 0)
+        player:get_meta():set_int("highscore", p_get(player, "highscore"))
+end
+
+local function get_score(player, highscore)
+        local n = p_get(player, "score")
+        if highscore then
+                n = p_get(player, "highscore")
+        end
+        local score = tostring(n)
+        local len = string.len(score)
+        if len < 6 then
+                for i = 1, 6 - len do
+                        score = 0 .. score
+                end
+        end
+        return score
+end
+
+local function update_score_hud(player)
+        player:hud_change(p_get(player, "hud").score, "text", "HI " .. get_score(player, true) .. "   " .. get_score(player))
+end
+
+local function pause_game(player, balloon)
+        set_highscore(player)
+        set_status(player, "paused")
+        add_paused_screen(player)
+        reset_pos(balloon)
+end
 
 local balloon_scale = 3
 minetest.register_entity("balloon:balloon", {
@@ -230,57 +308,112 @@ minetest.register_entity("balloon:balloon", {
                 physical = true,
                 collide_with_objects = false,
                 textures = {"balloon_balloon.png"},
-                collisionbox = {-0.5 * balloon_scale, 0, -0.5 * balloon_scale, 0.5 * balloon_scale, 1 * balloon_scale, 0.5 * balloon_scale},
-                --pointable = false,
+                collisionbox = {-0.2 * balloon_scale, 0, -0.2 * balloon_scale, 0.2 * balloon_scale, 1 * balloon_scale, 0.2 * balloon_scale},
                 automatic_rotate = 0.1,
-                visual_size = {
-                        x = balloon_scale,
-                        y = balloon_scale,
-                        z = balloon_scale,
-                },
-                --glow = 1, TODO: check for night
-                --automatic_face_movement_dir = 1,
-                --automatic_face_movement_max_rotation_per_sec = -2,
+                visual_size = vector.new(balloon_scale, balloon_scale, balloon_scale),
         },
-        on_activate = function(self, staticdata, dtime_s)
-                self.object:set_velocity({x=0, y=1, z=0})
-        end,
-        _lost = false,
+        _balloonist = nil,
         on_step = function(self, dtime, moveresult)
-                if moveresult.touching_ground and not self._lost then
-                        self._lost = true
+                for n, _ in pairs(timers) do
+                        timers[n] = timers[n] + dtime
+                end
+
+                local balloon = self.object
+                
+                if self._balloonist then
+                        local player = self._balloonist
+                        local control = player:get_player_control()
+                        local status = get_status(player)
+
+                        minetest.close_formspec(player:get_player_name(), "")
+
+                        if timers.environment >= 30 then
+                                set_random_sky(player)
+                                timers.environment = 0
+                        end
+
+                        if status == "running" then
+                                if timers.score >= 0.5 then
+                                        p_set(player, "score", math.ceil(balloon:get_pos().x))--p_get(player, "score") + 1)
+                                end
+                                
+                                if control.left then
+                                        balloon:set_velocity(vector.new(5, -1, 10))
+                                elseif control.right then
+                                        balloon:set_velocity(vector.new(5, -1, -10))
+                                else
+                                        balloon:set_velocity(vector.new(10, -1, 0))
+                                end
+
+                                if control.sneak then
+                                        pause_game(player, balloon)
+                                end
+
+                        elseif status == "paused" or status == "not_started" then
+                                if control.jump then
+                                        set_status(player, "running")
+                                        player:hud_remove(players[player].hud.paused)
+                                end
+                        end
+
+                        for _, collision in pairs(moveresult.collisions) do
+                                if minetest.get_node(collision.node_pos).name ~= "" then
+                                        pause_game(player, balloon)
+                                        break
+                                end
+                        end
+                        update_score_hud(player)
+                else
+                        balloon:remove()
                 end
         end,
-        
+        _attach_balloonist = function(self, player)
+		self._balloonist = player
+		player:set_attach(self.object, "", vector.new(0, 0, 0), vector.new(0, 0, 0))
+	end,
 })
 
-local players = {}
-minetest.register_on_joinplayer(function(player)
-        set_environment(player)
-        minetest.add_entity(player:get_pos(), "balloon:balloon")
-        players[player] = {}
-        players[player].hud = player:hud_add({
-                hud_elem_type = "image",
-                position = { x = 0.5, y = 0.5 },
-                scale = { x = -101, y = -101 },
-                text = "balloon_hud_overlay.png",
-                z_index = 0,
-        })
+minetest.register_on_newplayer(function(player)
+        reset_pos(player)
 end)
 
+minetest.register_on_joinplayer(function(player)
+        set_environment(player)
 
+        players[player] = {
+                status = "not_started",
+                -- "not_started", "paused", "running"
+                score = 0,
+                highscore = player:get_meta():get_int("highscore"),
+        }
+        players[player].hud = {
+                overlay = player:hud_add({
+                        hud_elem_type = "image",
+                        position = {x = 0.5, y = 0.5},
+                        scale = {x = -101, y = -101},
+                        text = "balloon_hud_overlay.png",
+                        z_index = -1,
+                }),
+                score = player:hud_add({
+                        hud_elem_type = "text",
+                        position = {x = 0, y = 0},
+                        offset = {x = 20, y = 20},
+                        text = "HI 000000   000000",
+                        number = 0x4B726E,
+                        alignment = {x = 1, y = 1},
+                        z_index = 0,
+                        style = 1,
+                })
+        }
+        add_paused_screen(player)
+        reset_pos(player)
 
-minetest.register_globalstep(function(dtime)
-        for a, _ in pairs(timers) do
-                timers[a] = timers[a] + dtime
-        end
-	for _, player in pairs(minetest.get_connected_players()) do
-		minetest.close_formspec(player:get_player_name(), "")
-                if timers.environment >= 30 then
-                        set_random_sky(player)
-                        timers.environment = 0
-                end
-	end
+        local balloon = minetest.add_entity(player:get_pos(), "balloon:balloon"):get_luaentity()
+        balloon._attach_balloonist(balloon, player)
+end)
+
+minetest.register_on_leaveplayer(function(player)
+        players[player] = nil
 end)
 
 local mapgen_aliases = {

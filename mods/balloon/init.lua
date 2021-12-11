@@ -160,7 +160,7 @@ for n, color in pairs(colors) do
                         y_min = 2,
                         y_max = 1000,
                         schematic = {
-                                size = {x = 7, y = 10, z = 7},
+                                size = vector.new(7, 10, 7),
 	                        data = get_tree_schematic(
                                         {name = "air", param1 = 255, param2 = 0},
                                         {name = prefix .. random_color(13), param1 = 255, param2 = 0},
@@ -190,7 +190,7 @@ local function set_random_sky(player)
         })
         player:set_clouds({
                 color = clr2,
-                speed = {x = -10, z = -20},
+                speed = {x = 20, z = 10},
         })
 end
 
@@ -198,9 +198,10 @@ local timers = {
         environment = 0,
         balloon = 0,
         score = 0,
+        counter = 0,
+        spawn_objects = 0,
 }
 
--- player
 local players = {}
 
 local function p_get(p, v)
@@ -213,7 +214,6 @@ end
 
 local function set_environment(player)
         player:hud_set_flags({
-                --hotbar = false,
                 healthbar = false,
                 crosshair = false,
                 wielditem = false,
@@ -223,32 +223,36 @@ local function set_environment(player)
         })
         player:hud_set_hotbar_image("blank.png")
         player:hud_set_hotbar_selected_image("balloon_hotbar_selected.png")
-        player:set_inventory_formspec("size[0.1, 0.1]")
+        player:hud_set_hotbar_itemcount(2)
         player:set_sun({
                 sunrise_visible = false,
         })
         player:set_stars({
                 count = 500,
         })
-        player:set_eye_offset(vector.new(0, 5, -60))
-        --player:set_look_horizontal(0)
+        player:set_eye_offset(vector.new(0, 20, -60))
+        player:set_look_horizontal(4.7)
+        player:set_look_vertical(0)
         set_random_sky(player)
         player:set_properties({
                 textures = {"blank.png"},
         })
         player:override_day_night_ratio(0.7)
-end
-
-local function get_status(player)
-        return players[player].status
-end
-
-local function set_status(player, status)
-        players[player].status = status
+        player:set_inventory_formspec(
+                "formspec_version[4]"..
+                "size[10, 10]" ..
+                "label[0.5,0.5;Controls:\n\n" ..
+                "- down: lower the balloon\n" ..
+                "- left: move the balloon to the left\n" ..
+                "- right: move the balloon to the rigth\n" ..
+                "- jump: start game\n" ..
+                "- aux1: abort game\n" ..
+                "- dig: use the selected item]"
+	)
 end
 
 local function reset_pos(obj)
-        obj:set_pos(vector.new(0, 100, 0))
+        obj:move_to(vector.new(0, 100, 0))
         obj:set_velocity(vector.new(0, 0, 0))
 end
 
@@ -275,7 +279,7 @@ local function set_highscore(player)
 end
 
 local function get_score(player, highscore)
-        local n = p_get(player, "score")
+        local n = p_get(player, "score") + p_get(player, "coin_points")
         if highscore then
                 n = p_get(player, "highscore")
         end
@@ -295,17 +299,79 @@ end
 
 local function pause_game(player, balloon)
         set_highscore(player)
-        set_status(player, "paused")
+        p_set(player, "status", "paused")
         add_paused_screen(player)
         reset_pos(balloon)
+        balloon:set_properties({
+                physical = false,
+        })
 end
 
+minetest.register_craftitem(prefix .. "gasbottle_item", {
+        inventory_image = "balloon_gasbottle.png",
+        on_use = function(itemstack, user, pointed_thing)
+        end,
+})
+
+minetest.register_craftitem(prefix .. "sandbag_item", {
+        inventory_image = "balloon_sandbag.png",
+        on_use = function(itemstack, user, pointed_thing)
+        end,
+})
+
+local function register_spawn_entity(name, scale, texture, rotation, extras)
+        local properties = {
+                initial_properties = {
+                        visual = "mesh",
+                        mesh = "balloon_" .. name .. ".obj",
+                        physical = true,
+                        collide_with_objects = false,
+                        pointable = false,
+                        textures = {texture},
+                        visual_size = vector.new(scale, scale, scale),
+                },
+                _attached_player = nil,
+                on_step = function(self)
+                        local player = self._attached_player
+                        if not player or
+                        (player and (p_get(player, "status") == "paused") or (self.object:get_pos().x - player:get_pos().x > 200)) then
+                                self.object:remove()
+                        end
+                end,
+        }
+
+        if rotation then
+                properties.initial_properties.automatic_rotate = 3
+        end
+
+        if extras then
+                for setting, value in pairs(extras) do
+                        properties[setting] = value
+                end
+        end
+
+        minetest.register_entity(prefix .. name, properties)
+end
+
+register_spawn_entity("coin", 6, "balloon_coin.png", true)
+register_spawn_entity("bird", 6, "", false, {
+        on_activate = function(self)
+                self.object:set_properties({
+                        textures = {color_to_texture(random_color())},
+                })
+                self.object:set_velocity(vector.new(-10, math.random(-2, 2), math.random(-2, 2)))
+        end
+})
+register_spawn_entity("gasbottle", 10, color_to_texture(3), true)
+register_spawn_entity("sandbag", 10, color_to_texture(8), true)
+
 local balloon_scale = 3
-minetest.register_entity("balloon:balloon", {
+minetest.register_entity(prefix .. "balloon", {
         initial_properties = {
                 visual = "mesh",
-                mesh = "balloon.obj",
+                mesh = "balloon_balloon.obj",
                 physical = true,
+                pointable = false,
                 collide_with_objects = false,
                 textures = {"balloon_balloon.png"},
                 collisionbox = {-0.2 * balloon_scale, 0, -0.2 * balloon_scale, 0.2 * balloon_scale, 1 * balloon_scale, 0.2 * balloon_scale},
@@ -317,15 +383,14 @@ minetest.register_entity("balloon:balloon", {
                 for n, _ in pairs(timers) do
                         timers[n] = timers[n] + dtime
                 end
-
                 local balloon = self.object
                 
                 if self._balloonist then
                         local player = self._balloonist
+                        local player_name = player:get_player_name()
                         local control = player:get_player_control()
-                        local status = get_status(player)
-
-                        minetest.close_formspec(player:get_player_name(), "")
+                        local status = p_get(player, "status")
+                        local balloon_pos = balloon:get_pos()
 
                         if timers.environment >= 30 then
                                 set_random_sky(player)
@@ -333,35 +398,92 @@ minetest.register_entity("balloon:balloon", {
                         end
 
                         if status == "running" then
+                                minetest.add_particle({
+                                        pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.5, math.random(-15, 15) / 100),
+                                        velocity = vector.offset(balloon:get_velocity(), 0, 2, 0),
+                                        expirationtime = 0.3,
+                                        size = math.random(1, 10) / 20,
+                                        texture = color_to_texture(math.random(1, 4)),
+                                        playername = player_name,
+                                })
+
                                 if timers.score >= 0.5 then
-                                        p_set(player, "score", math.ceil(balloon:get_pos().x))--p_get(player, "score") + 1)
-                                end
-                                
-                                if control.left then
-                                        balloon:set_velocity(vector.new(5, -1, 10))
-                                elseif control.right then
-                                        balloon:set_velocity(vector.new(5, -1, -10))
-                                else
-                                        balloon:set_velocity(vector.new(10, -1, 0))
+                                        p_set(player, "score", math.floor(balloon_pos.x + 0.5))
                                 end
 
-                                if control.sneak then
+                                local vx, vy, vz = 10, -1, 0
+                                if control.left then
+                                        vz = 20
+                                elseif control.right then
+                                        vz = -20
+                                else
+                                        vx = 20
+                                end
+                                if control.down then
+                                        vy = -10
+                                end
+                                balloon:set_velocity(vector.new(vx, vy, vz))
+
+                                if control.aux1 then
                                         pause_game(player, balloon)
                                 end
 
-                        elseif status == "paused" or status == "not_started" then
+                                if timers.spawn_objects > math.random(10, 30) / 10 then
+                                        local coin = minetest.add_entity(
+                                                vector.offset(balloon_pos,
+                                                        math.random(50, 200),
+                                                        math.random(-10, 10),
+                                                        math.random(-20, 20)
+                                                ), "balloon:gasbottle"
+                                        )
+                                        coin:get_luaentity()._attached_player = player
+                                        timers.spawn_objects = 0
+                                end
+                        elseif status == "counting" then
+                                local counting = p_get(player, "counting")
+                                if not p_get(player, "hud").counter then
+                                        players[player].hud.counter = player:hud_add({
+                                                hud_elem_type = "text",
+                                                position = {x = 0.5, y = 0.5},
+                                                text = counting,
+                                                number = 0x4B726E,
+                                                size = {x = 5, y = 5},
+                                                z_index = 0,
+                                                style = 1,
+                                        })
+                                        balloon:set_velocity(vector.new(0, 0, 0))
+                                elseif counting < 0 then
+                                        pause_game(player, balloon)
+                                        player:hud_remove(p_get(player, "hud").counter)
+                                        p_set(player, "counting", 5)
+                                        players[player].hud.counter = nil
+                                else
+                                        if timers.counter >= 0.5 then
+                                                p_set(player, "counting", counting - 1)
+                                                player:hud_change(p_get(player, "hud").counter, "text", counting)
+                                                timers.counter = 0
+                                        end
+                                end
+                        elseif status == "paused" then
                                 if control.jump then
-                                        set_status(player, "running")
+                                        p_set(player, "status", "running")
                                         player:hud_remove(players[player].hud.paused)
                                 end
                         end
 
-                        for _, collision in pairs(moveresult.collisions) do
-                                if minetest.get_node(collision.node_pos).name ~= "" then
-                                        pause_game(player, balloon)
-                                        break
+                        if balloon_pos.x >= 60 and not balloon:get_properties().physical and minetest.get_node(balloon_pos).name == "air" then
+                                self.object:set_properties({
+                                        physical = true,
+                                })
+                        elseif moveresult then
+                                for _, collision in pairs(moveresult.collisions) do
+                                        if minetest.get_node(collision.node_pos).name ~= "" then
+                                                p_set(player, "status", "counting")
+                                                break
+                                        end
                                 end
                         end
+
                         update_score_hud(player)
                 else
                         balloon:remove()
@@ -381,10 +503,13 @@ minetest.register_on_joinplayer(function(player)
         set_environment(player)
 
         players[player] = {
-                status = "not_started",
-                -- "not_started", "paused", "running"
+                status = "paused",
+                -- "paused", "running", "counting"
                 score = 0,
+                coin_points = 0,
+                counting = 5,
                 highscore = player:get_meta():get_int("highscore"),
+                balloon = nil,
         }
         players[player].hud = {
                 overlay = player:hud_add({
@@ -396,20 +521,21 @@ minetest.register_on_joinplayer(function(player)
                 }),
                 score = player:hud_add({
                         hud_elem_type = "text",
-                        position = {x = 0, y = 0},
-                        offset = {x = 20, y = 20},
-                        text = "HI 000000   000000",
+                        position = {x = 1, y = 0},
+                        offset = {x = -20, y = 20},
+                        text = "",
                         number = 0x4B726E,
-                        alignment = {x = 1, y = 1},
+                        alignment = {x = -1, y = 1},
                         z_index = 0,
                         style = 1,
                 })
         }
-        add_paused_screen(player)
-        reset_pos(player)
-
         local balloon = minetest.add_entity(player:get_pos(), "balloon:balloon"):get_luaentity()
         balloon._attach_balloonist(balloon, player)
+
+        local balloon_obj = balloon.object
+        pause_game(player, balloon_obj)
+        p_set(player, "balloon", balloon_obj)
 end)
 
 minetest.register_on_leaveplayer(function(player)
@@ -425,3 +551,26 @@ local mapgen_aliases = {
 for _, mg_alias in pairs(mapgen_aliases) do
         minetest.register_alias("mapgen_" .. mg_alias[1], prefix .. mg_alias[2])
 end
+
+minetest.register_chatcommand("scores", {
+        description = "Get the highscore of all players",
+        func = function(name, param)
+                local str = ""
+                for player, _ in pairs(players) do
+                        str = str .. player:get_player_name() .. ": " .. p_get(player, "highscore") .. "\n"
+                end
+                minetest.chat_send_player(name, minetest.colorize("#" .. colors[13], str))
+        end
+})
+
+--[[minetest.sound_play(
+        {
+                name = "balloon_sink",
+                gain = 1.0,
+                pitch = 1.0,
+        },
+        {
+                to_player = player_name,
+                object = balloon,
+        }, true
+)]]

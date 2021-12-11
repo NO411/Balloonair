@@ -1,4 +1,4 @@
-local minetest, math, vector, pairs = minetest, math, vector, pairs
+local minetest, math, vector, pairs, table = minetest, math, vector, pairs, table
 local modname = minetest.get_current_modname()
 local modpath = minetest.get_modpath(modname)
 
@@ -37,6 +37,10 @@ local function random_color(disallowed_color)
                 clr = math.random(#colors)
         end
         return clr
+end
+
+local function table_random(t)
+        return t[math.random(#t)]
 end
 
 minetest.register_node(prefix .. 13, {
@@ -205,7 +209,11 @@ local timers = {
 local players = {}
 
 local function p_get(p, v)
-        return players[p][v]
+        if players[p] then
+                return players[p][v]
+        else
+                return ""
+        end
 end
 
 local function p_set(p, v, n)
@@ -230,25 +238,28 @@ local function set_environment(player)
         player:set_stars({
                 count = 500,
         })
-        player:set_eye_offset(vector.new(0, 20, -60))
+        player:set_eye_offset(vector.new(0, 30, -60))
         player:set_look_horizontal(4.7)
         player:set_look_vertical(0)
         set_random_sky(player)
         player:set_properties({
                 textures = {"blank.png"},
+                pointable = false,
         })
         player:override_day_night_ratio(0.7)
         player:set_inventory_formspec(
                 "formspec_version[4]"..
                 "size[10, 10]" ..
                 "label[0.5,0.5;Controls:\n\n" ..
-                "- down: lower the balloon\n" ..
-                "- left: move the balloon to the left\n" ..
-                "- right: move the balloon to the rigth\n" ..
-                "- jump: start game\n" ..
-                "- aux1: abort game\n" ..
-                "- dig: use the selected item]"
-	)
+                "- Down: lower the balloon\n" ..
+                "- Left: move the balloon to the left\n" ..
+                "- Right: move the balloon to the rigth\n" ..
+                "- Jump: start game\n" ..
+                "- Aux1: abort game\n" ..
+                "- Dig: use the selected item\n" ..
+                "- Escape: pause game]"
+        )
+        player:get_inventory():set_size("main", 2)
 end
 
 local function reset_pos(obj)
@@ -270,11 +281,12 @@ local function add_paused_screen(player)
 end
 
 local function set_highscore(player)
-        local score = p_get(player, "score")
+        local score = p_get(player, "score") + p_get(player, "coin_points")
         if score > p_get(player, "highscore") then
                p_set(player, "highscore", score)
         end
         p_set(player, "score", 0)
+        p_set(player, "coin_points", 0)
         player:get_meta():set_int("highscore", p_get(player, "highscore"))
 end
 
@@ -297,6 +309,36 @@ local function update_score_hud(player)
         player:hud_change(p_get(player, "hud").score, "text", "HI " .. get_score(player, true) .. "   " .. get_score(player))
 end
 
+local function clear_inventory(player)
+        local inv = player:get_inventory()
+        for i = 1, inv:get_size("main") do
+                inv:remove_item("main", inv:get_stack("main", i))
+        end
+end
+
+local function remove_gas_drive(b_ent)
+        b_ent._gas_drive = false
+        b_ent._gasbottle:set_properties({
+                is_visible = false
+        })
+end
+
+local function remove_sand_drive(b_ent, all, sandbag)
+        if all then
+                b_ent._sand_drive = 0
+                for _, obj in pairs(b_ent._sandbags) do
+                        obj:set_properties({
+                                is_visible = false,
+                        })
+                end
+        elseif sandbag then
+                b_ent._sand_drive = b_ent._sand_drive - 1
+                sandbag:set_properties({
+                        is_visible = false,
+                })
+        end
+end
+
 local function pause_game(player, balloon)
         set_highscore(player)
         p_set(player, "status", "paused")
@@ -305,21 +347,72 @@ local function pause_game(player, balloon)
         balloon:set_properties({
                 physical = false,
         })
+        clear_inventory(player)
+        local b_ent = balloon:get_luaentity()
+        remove_gas_drive(b_ent)
+        remove_gas_drive(b_ent, true)
+end
+
+local function play_power_up(player)
+        minetest.sound_play({name = "balloon_rise", gain = 1.0, pitch = 1.0}, {to_player = player:get_player_name()}, true)
 end
 
 minetest.register_craftitem(prefix .. "gasbottle_item", {
         inventory_image = "balloon_gasbottle.png",
         on_use = function(itemstack, user, pointed_thing)
+                local balloon = p_get(user, "balloon")
+                local b_ent = balloon:get_luaentity()
+                if not b_ent._gas_drive and p_get(user, "status") == "running" then
+                        b_ent._gas_drive = true
+                        itemstack:take_item()
+                        local gasbottle = b_ent._gasbottle
+                        gasbottle:set_properties({
+                                is_visible = true
+                        })
+                        minetest.after(10, function()
+                                if balloon and gasbottle then
+                                        remove_gas_drive(b_ent)
+                                end
+                        end)
+                        play_power_up(user)
+                end
+                return itemstack
         end,
 })
 
 minetest.register_craftitem(prefix .. "sandbag_item", {
         inventory_image = "balloon_sandbag.png",
         on_use = function(itemstack, user, pointed_thing)
+                local balloon = p_get(user, "balloon")
+                local b_ent = balloon:get_luaentity()
+                local sand_drive = b_ent._sand_drive
+                if sand_drive < 4 then
+
+                        b_ent._sand_drive = sand_drive + 1
+                        local sandbag
+                        for _, obj in pairs(b_ent._sandbags) do
+                                if b_ent._sandbags and not obj:get_properties().is_visible then
+                                        obj:set_properties({
+                                                is_visible = true,
+                                        })
+                                        sandbag = obj
+                                        break
+                                end
+                        end
+                        itemstack:take_item()
+                        minetest.after(10, function()
+                                if balloon and sandbag then
+                                        remove_sand_drive(b_ent, false, sandbag)
+                                end
+                        end)
+                        play_power_up(user)
+                end
+                return itemstack
         end,
 })
 
-local function register_spawn_entity(name, scale, texture, rotation, extras)
+local spawn_entities = {}
+local function register_spawn_entity(name, scale, texture, rotation, spawn, extras)
         local properties = {
                 initial_properties = {
                         visual = "mesh",
@@ -333,15 +426,18 @@ local function register_spawn_entity(name, scale, texture, rotation, extras)
                 _attached_player = nil,
                 on_step = function(self)
                         local player = self._attached_player
-                        if not player or
-                        (player and (p_get(player, "status") == "paused") or (self.object:get_pos().x - player:get_pos().x > 200)) then
+                        if not player or (spawn and (player and p_get(player, "status") == "paused") or (player:get_pos() and self.object:get_pos().x - player:get_pos().x > 200)) then
                                 self.object:remove()
                         end
                 end,
         }
 
         if rotation then
-                properties.initial_properties.automatic_rotate = 3
+                local r = 3
+                if type(rotation) == "number" then
+                        r = rotation
+                end
+                properties.initial_properties.automatic_rotate = r
         end
 
         if extras then
@@ -350,11 +446,18 @@ local function register_spawn_entity(name, scale, texture, rotation, extras)
                 end
         end
 
-        minetest.register_entity(prefix .. name, properties)
+        local ent_name = prefix .. name
+        if spawn then
+                table.insert(spawn_entities, ent_name)
+        else
+                properties.initial_properties.is_visible = false
+        end
+        minetest.register_entity(ent_name, properties)
+
 end
 
-register_spawn_entity("coin", 6, "balloon_coin.png", true)
-register_spawn_entity("bird", 6, "", false, {
+register_spawn_entity("coin", 15, "balloon_coin.png", true, true)
+register_spawn_entity("bird", 10, "", false, true, {
         on_activate = function(self)
                 self.object:set_properties({
                         textures = {color_to_texture(random_color())},
@@ -362,10 +465,12 @@ register_spawn_entity("bird", 6, "", false, {
                 self.object:set_velocity(vector.new(-10, math.random(-2, 2), math.random(-2, 2)))
         end
 })
-register_spawn_entity("gasbottle", 10, color_to_texture(3), true)
-register_spawn_entity("sandbag", 10, color_to_texture(8), true)
+register_spawn_entity("gasbottle", 10, color_to_texture(3), true, true)
+register_spawn_entity("sandbag", 10, color_to_texture(8), true, true)
 
 local balloon_scale = 3
+register_spawn_entity("balloon_gasbottle", 1, color_to_texture(3), 0.1)
+register_spawn_entity("balloon_sandbag", 1, color_to_texture(8), 0.1)
 minetest.register_entity(prefix .. "balloon", {
         initial_properties = {
                 visual = "mesh",
@@ -379,14 +484,17 @@ minetest.register_entity(prefix .. "balloon", {
                 visual_size = vector.new(balloon_scale, balloon_scale, balloon_scale),
         },
         _balloonist = nil,
+        _gas_drive = false,
+        _sand_drive = 0,
+        _gasbottle = nil,
+        _sandbags = {nil},
         on_step = function(self, dtime, moveresult)
                 for n, _ in pairs(timers) do
                         timers[n] = timers[n] + dtime
                 end
                 local balloon = self.object
-                
-                if self._balloonist then
-                        local player = self._balloonist
+                local player = self._balloonist
+                if player and players[player] then
                         local player_name = player:get_player_name()
                         local control = player:get_player_control()
                         local status = p_get(player, "status")
@@ -398,15 +506,6 @@ minetest.register_entity(prefix .. "balloon", {
                         end
 
                         if status == "running" then
-                                minetest.add_particle({
-                                        pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.5, math.random(-15, 15) / 100),
-                                        velocity = vector.offset(balloon:get_velocity(), 0, 2, 0),
-                                        expirationtime = 0.3,
-                                        size = math.random(1, 10) / 20,
-                                        texture = color_to_texture(math.random(1, 4)),
-                                        playername = player_name,
-                                })
-
                                 if timers.score >= 0.5 then
                                         p_set(player, "score", math.floor(balloon_pos.x + 0.5))
                                 end
@@ -419,26 +518,77 @@ minetest.register_entity(prefix .. "balloon", {
                                 else
                                         vx = 20
                                 end
+
+                                if self._gas_drive then
+                                        minetest.add_particle({
+                                                pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.5, math.random(-15, 15) / 100),
+                                                velocity = vector.offset(balloon:get_velocity(), 0, 2, 0),
+                                                expirationtime = 0.3,
+                                                size = math.random(1, 10) / 20,
+                                                texture = color_to_texture(math.random(1, 4)),
+                                                playername = player_name,
+                                        })
+                                        vx = vx + 30
+                                end
+
+                                local sand_drive = self._sand_drive
+                                if sand_drive > 0 then
+                                        minetest.add_particle({
+                                                pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.5, math.random(-15, 15) / 100),
+                                                velocity = vector.offset(balloon:get_velocity(), 0, -2, 0),
+                                                expirationtime = 0.3,
+                                                size = math.random(1, 10) / 20,
+                                                texture = color_to_texture(table_random({1, 6, 15, 16})),
+                                                playername = player_name,
+                                        })
+                                        vy = sand_drive * 2
+                                end
+
                                 if control.down then
                                         vy = -10
                                 end
+
                                 balloon:set_velocity(vector.new(vx, vy, vz))
 
                                 if control.aux1 then
                                         pause_game(player, balloon)
                                 end
 
-                                if timers.spawn_objects > math.random(10, 30) / 10 then
-                                        local coin = minetest.add_entity(
+                                if timers.spawn_objects > 1 then
+                                        local ent = minetest.add_entity(
                                                 vector.offset(balloon_pos,
                                                         math.random(50, 200),
                                                         math.random(-10, 10),
                                                         math.random(-20, 20)
-                                                ), "balloon:gasbottle"
+                                                ), table_random(spawn_entities)
                                         )
-                                        coin:get_luaentity()._attached_player = player
+                                        ent:get_luaentity()._attached_player = player
                                         timers.spawn_objects = 0
                                 end
+
+                                local radius = balloon_scale / 2
+                                for _, obj in pairs(minetest.get_objects_inside_radius(balloon_pos, radius + 2)) do
+                                        local ent = obj:get_luaentity()
+                                        if ent then
+                                                local ename = ent.name
+                                                if ename ~= prefix .. "balloon" and ename ~= prefix .. "balloon_gasbottle" and ename ~= prefix .. "balloon_sandbag" then
+                                                        if ename == prefix .. "bird" then
+                                                                minetest.sound_play({name = "balloon_bird" .. math.random(1, 3), gain = 1.0, pitch = 1.0}, {to_player = player_name, object = obj}, true)
+                                                        else
+                                                                minetest.sound_play({name = "balloon_collect", gain = 1.0, pitch = 1.0}, {to_player = player_name, object = obj}, true)
+                                                        end
+
+                                                        if ename == prefix .. "coin" then
+                                                                p_set(player, "coin_points", p_get(player, "coin_points") + 100)
+                                                        elseif ename == prefix .. "sandbag" or ename == prefix .. "gasbottle" then
+                                                                player:get_inventory():add_item("main", {name = ename .. "_item"})
+                                                        end
+                                                        obj:move_to(balloon_pos)
+                                                        obj:remove()
+                                                end
+                                        end
+                                end
+
                         elseif status == "counting" then
                                 local counting = p_get(player, "counting")
                                 if not p_get(player, "hud").counter then
@@ -490,8 +640,21 @@ minetest.register_entity(prefix .. "balloon", {
                 end
         end,
         _attach_balloonist = function(self, player)
+                local balloon = self.object
 		self._balloonist = player
-		player:set_attach(self.object, "", vector.new(0, 0, 0), vector.new(0, 0, 0))
+		player:set_attach(balloon, "", vector.new(0, 0, 0), vector.new(0, 0, 0))
+
+                local gasbottle = minetest.add_entity(balloon:get_pos(), prefix .. "balloon_gasbottle")
+                gasbottle:set_attach(balloon, "", vector.new(0, 0, 0), vector.new(0, 0, 0))
+                gasbottle:get_luaentity()._attached_player = player
+                self._gasbottle = gasbottle
+
+                for i = 1, 4 do
+                        local sandbag = minetest.add_entity(balloon:get_pos(), prefix .. "balloon_sandbag")
+                        sandbag:set_attach(balloon, "", vector.new(0, 0, 0), vector.new(0, (i - 1) * 90, 0))
+                        sandbag:get_luaentity()._attached_player = player
+                        self._sandbags[i] = sandbag
+                end
 	end,
 })
 
@@ -530,7 +693,7 @@ minetest.register_on_joinplayer(function(player)
                         style = 1,
                 })
         }
-        local balloon = minetest.add_entity(player:get_pos(), "balloon:balloon"):get_luaentity()
+        local balloon = minetest.add_entity(player:get_pos(), prefix .. "balloon"):get_luaentity()
         balloon._attach_balloonist(balloon, player)
 
         local balloon_obj = balloon.object
@@ -553,7 +716,7 @@ for _, mg_alias in pairs(mapgen_aliases) do
 end
 
 minetest.register_chatcommand("scores", {
-        description = "Get the highscore of all players",
+        description = "Get the highscore of all online players",
         func = function(name, param)
                 local str = ""
                 for player, _ in pairs(players) do
@@ -562,15 +725,3 @@ minetest.register_chatcommand("scores", {
                 minetest.chat_send_player(name, minetest.colorize("#" .. colors[13], str))
         end
 })
-
---[[minetest.sound_play(
-        {
-                name = "balloon_sink",
-                gain = 1.0,
-                pitch = 1.0,
-        },
-        {
-                to_player = player_name,
-                object = balloon,
-        }, true
-)]]

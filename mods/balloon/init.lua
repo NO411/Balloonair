@@ -414,7 +414,7 @@ local function register_spawn_entity(name, scale, texture, rotation, spawn, extr
                         mesh = "balloon_" .. name .. ".obj",
                         physical = true,
                         collide_with_objects = false,
-                        pointable = false,
+                        --pointable = false,
                         textures = {texture},
                         visual_size = vector.new(scale, scale, scale),
                 },
@@ -483,6 +483,7 @@ minetest.register_entity(prefix .. "balloon", {
         _sand_drive = 0,
         _gasbottle = nil,
         _sandbags = {nil},
+	_bird_drive = false,
         on_step = function(self, dtime, moveresult)
                 for n, _ in pairs(timers) do
                         timers[n] = timers[n] + dtime
@@ -515,14 +516,16 @@ minetest.register_entity(prefix .. "balloon", {
                                 end
 
                                 if self._gas_drive then
-                                        minetest.add_particle({
-                                                pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.5, math.random(-15, 15) / 100),
-                                                velocity = vector.offset(balloon:get_velocity(), 0, 2, 0),
-                                                expirationtime = 0.3,
-                                                size = math.random(1, 10) / 20,
-                                                texture = color_to_texture(math.random(1, 4)),
-                                                playername = player_name,
-                                        })
+					for i = 1, 2 do
+                                        	minetest.add_particle({
+                                        	        pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.6, math.random(-15, 15) / 100),
+                                        	        velocity = vector.offset(balloon:get_velocity(), 0, 2, 0),
+                                        	        expirationtime = 0.3,
+                                        	        size = math.random(1, 10) / 20,
+                                        	        texture = color_to_texture(math.random(1, 4)),
+                                        	        playername = player_name,
+                                        	})
+					end
                                         vx = vx + 30
                                 end
 
@@ -543,6 +546,10 @@ minetest.register_entity(prefix .. "balloon", {
                                         vy = -10
                                 end
 
+				if self._bird_drive then
+					vy = vy - 20
+				end
+
                                 balloon:set_velocity(vector.new(vx, vy, vz))
 
                                 if control.aux1 then
@@ -561,7 +568,7 @@ minetest.register_entity(prefix .. "balloon", {
                                         end
                                         timers.spawn_objects = 0
                                 end
-				
+
                                 local radius = balloon_scale / 2
                                 for _, obj in pairs(minetest.get_objects_inside_radius(vector.offset(balloon_pos, 0, radius, 0), radius + 2)) do
                                         local ent = obj:get_luaentity()
@@ -570,6 +577,13 @@ minetest.register_entity(prefix .. "balloon", {
                                                 if ename ~= prefix .. "balloon" and ename ~= prefix .. "balloon_gasbottle" and ename ~= prefix .. "balloon_sandbag" then
                                                         if ename == prefix .. "bird" then
                                                                 minetest.sound_play({name = "balloon_bird" .. math.random(1, 3), gain = 1.0, pitch = 1.0}, {to_player = player_name, object = obj}, true)
+								minetest.sound_play({name = "balloon_sink", gain = 1.0, pitch = 1.0}, {to_player = player:get_player_name()}, true)
+								self._bird_drive = true
+								minetest.after(2, function()
+									if player and self._bird_drive then
+										self._bird_drive = false
+									end
+								end)
                                                         else
                                                                 minetest.sound_play({name = "balloon_collect", gain = 1.0, pitch = 1.0}, {to_player = player_name, object = obj}, true)
                                                         end

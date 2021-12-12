@@ -309,13 +309,6 @@ local function update_score_hud(player)
         player:hud_change(p_get(player, "hud").score, "text", "HI " .. get_score(player, true) .. "   " .. get_score(player))
 end
 
-local function clear_inventory(player)
-        local inv = player:get_inventory()
-        for i = 1, inv:get_size("main") do
-                inv:remove_item("main", inv:get_stack("main", i))
-        end
-end
-
 local function remove_gas_drive(b_ent)
         b_ent._gas_drive = false
         b_ent._gasbottle:set_properties({
@@ -347,7 +340,9 @@ local function pause_game(player, balloon)
         balloon:set_properties({
                 physical = false,
         })
-        clear_inventory(player)
+        for i, item in pairs({"gasbottle", "sandbag"}) do
+                player:get_inventory():set_stack("main", i, {name = prefix .. item .. "_item", count = 2})
+        end
         local b_ent = balloon:get_luaentity()
         remove_gas_drive(b_ent)
         remove_gas_drive(b_ent, true)
@@ -386,7 +381,7 @@ minetest.register_craftitem(prefix .. "sandbag_item", {
                 local balloon = p_get(user, "balloon")
                 local b_ent = balloon:get_luaentity()
                 local sand_drive = b_ent._sand_drive
-                if sand_drive < 4 then
+                if sand_drive < 4 and p_get(user, "status") == "running" then
 
                         b_ent._sand_drive = sand_drive + 1
                         local sandbag
@@ -555,19 +550,20 @@ minetest.register_entity(prefix .. "balloon", {
                                 end
 
                                 if timers.spawn_objects > 1 then
-                                        local ent = minetest.add_entity(
-                                                vector.offset(balloon_pos,
-                                                        math.random(50, 200),
-                                                        math.random(-10, 10),
-                                                        math.random(-20, 20)
-                                                ), table_random(spawn_entities)
+                                        local random_pos = vector.offset(balloon_pos,
+                                                math.random(50, 200),
+                                                math.random(-10, 10),
+                                                math.random(-20, 20)
                                         )
-                                        ent:get_luaentity()._attached_player = player
+                                        if minetest.get_node(random_pos).name == "air" then
+                                                local ent = minetest.add_entity(random_pos, table_random(spawn_entities))
+                                                ent:get_luaentity()._attached_player = player
+                                        end
                                         timers.spawn_objects = 0
                                 end
-
+				
                                 local radius = balloon_scale / 2
-                                for _, obj in pairs(minetest.get_objects_inside_radius(balloon_pos, radius + 2)) do
+                                for _, obj in pairs(minetest.get_objects_inside_radius(vector.offset(balloon_pos, 0, radius, 0), radius + 2)) do
                                         local ent = obj:get_luaentity()
                                         if ent then
                                                 local ename = ent.name
@@ -580,6 +576,27 @@ minetest.register_entity(prefix .. "balloon", {
 
                                                         if ename == prefix .. "coin" then
                                                                 p_set(player, "coin_points", p_get(player, "coin_points") + 100)
+                                                                local bonus_hud = p_get(player, "hud").bonus_points
+                                                                if not bonus_hud then
+                                                                        players[player].hud.bonus_points = player:hud_add({
+                                                                                hud_elem_type = "text",
+                                                                                position = {x = 0.75, y = 0.5},
+                                                                                text = "+100",
+                                                                                number = 0x4B726E,
+                                                                                z_index = 0,
+                                                                                style = 1,
+                                                                        })
+                                                                        minetest.after(2, function()
+                                                                                if player then
+                                                                                        player:hud_remove(p_get(player, "hud").bonus_points)
+                                                                                        players[player].hud.bonus_points = nil
+                                                                                end
+                                                                        end)
+                                                                else
+                                                                        local text = player:hud_get(bonus_hud).text
+                                                                        local value = tonumber(string.sub(text, 2, 2)) + 1
+                                                                        player:hud_change(bonus_hud, "text", "+" .. value .. "00")
+                                                                end
                                                         elseif ename == prefix .. "sandbag" or ename == prefix .. "gasbottle" then
                                                                 player:get_inventory():add_item("main", {name = ename .. "_item"})
                                                         end

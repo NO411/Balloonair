@@ -204,6 +204,7 @@ local timers = {
         score = 0,
         counter = 0,
         spawn_objects = 0,
+	change_spawn_pos = 0,
 }
 
 local players = {}
@@ -348,10 +349,6 @@ local function pause_game(player, balloon)
         remove_sand_drive(b_ent, true)
 end
 
-local function play_power_up(player)
-        minetest.sound_play({name = "balloon_rise", gain = 1.0, pitch = 1.0}, {to_player = player:get_player_name()}, true)
-end
-
 minetest.register_craftitem(prefix .. "gasbottle_item", {
         inventory_image = "balloon_gasbottle.png",
         on_use = function(itemstack, user, pointed_thing)
@@ -369,7 +366,7 @@ minetest.register_craftitem(prefix .. "gasbottle_item", {
                                         remove_gas_drive(b_ent)
                                 end
                         end)
-                        play_power_up(user)
+                        minetest.sound_play({name = "balloon_gas" .. math.random(1, 2), gain = 1.0, pitch = 1.0}, {to_player = user:get_player_name()}, true)
                 end
                 return itemstack
         end,
@@ -400,7 +397,7 @@ minetest.register_craftitem(prefix .. "sandbag_item", {
                                         remove_sand_drive(b_ent, false, sandbag)
                                 end
                         end)
-                        play_power_up(user)
+                        minetest.sound_play({name = "balloon_sand" .. math.random(1, 2), gain = 1.0, pitch = 1.0}, {to_player = user:get_player_name()}, true)
                 end
                 return itemstack
         end,
@@ -485,6 +482,7 @@ minetest.register_entity(prefix .. "balloon", {
         _gasbottle = nil,
         _sandbags = {nil},
 	_bird_drive = false,
+	_spawn_pos = {y = 0, z = 0},
         on_step = function(self, dtime, moveresult)
                 for n, _ in pairs(timers) do
                         timers[n] = timers[n] + dtime
@@ -559,16 +557,28 @@ minetest.register_entity(prefix .. "balloon", {
                                         pause_game(player, balloon)
                                 end
 
-                                if timers.spawn_objects > 1 then
-                                        local random_pos = vector.offset(balloon_pos,
-                                                math.random(50, 200),
-                                                math.random(-10, 10),
-                                                math.random(-20, 20)
-                                        )
-                                        if minetest.get_node(random_pos).name == "air" then
-                                                local ent = minetest.add_entity(random_pos, table_random(spawn_entities))
-                                                ent:get_luaentity()._attached_player = player
-                                        end
+				if timers.change_spawn_pos > 3 then
+					self._spawn_pos = {y = balloon_pos.y + math.random(-10, 10), z = balloon_pos.z + math.random(-20, 20)}
+					timers.change_spawn_pos = 0
+				end
+
+                                if timers.spawn_objects >= 0.7 then
+					local _pos = self._spawn_pos
+					local x = balloon_pos.x + 90
+					if math.random(1, 10) == 1 then
+						for i = -2, 2 do
+							local pos = vector.new(x, _pos.y, _pos.z + i * 8)
+							if minetest.get_node(pos).name == "air" then
+								minetest.add_entity(pos, table_random(spawn_entities)):get_luaentity()._attached_player = player
+							end
+						end
+					else
+						local pos = vector.new(x, _pos.y, _pos.z)
+                                        	if minetest.get_node(pos).name == "air" then
+                                        	        minetest.add_entity(pos, table_random(spawn_entities)):get_luaentity()._attached_player = player
+                                        	end
+					end
+                                        
                                         timers.spawn_objects = 0
                                 end
 
@@ -580,7 +590,7 @@ minetest.register_entity(prefix .. "balloon", {
                                                 if ename ~= prefix .. "balloon" and ename ~= prefix .. "balloon_gasbottle" and ename ~= prefix .. "balloon_sandbag" then
                                                         if ename == prefix .. "bird" then
                                                                 minetest.sound_play({name = "balloon_bird" .. math.random(1, 3), gain = 1.0, pitch = 1.0}, {to_player = player_name, object = obj}, true)
-								minetest.sound_play({name = "balloon_sink", gain = 1.0, pitch = 1.0}, {to_player = player:get_player_name()}, true)
+								minetest.sound_play({name = "balloon_sink" .. math.random(1, 2), gain = 1.0, pitch = 1.0}, {to_player = player:get_player_name()}, true)
 								self._bird_drive = true
 								minetest.after(2, function()
 									if player and self._bird_drive then

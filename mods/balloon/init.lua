@@ -345,7 +345,7 @@ local function pause_game(player, balloon)
         end
         local b_ent = balloon:get_luaentity()
         remove_gas_drive(b_ent)
-        remove_gas_drive(b_ent, true)
+        remove_sand_drive(b_ent, true)
 end
 
 local function play_power_up(player)
@@ -414,9 +414,10 @@ local function register_spawn_entity(name, scale, texture, rotation, spawn, extr
                         mesh = "balloon_" .. name .. ".obj",
                         physical = true,
                         collide_with_objects = false,
-                        --pointable = false,
+                        pointable = false,
                         textures = {texture},
                         visual_size = vector.new(scale, scale, scale),
+			collisionbox = {-10, -10, -10, 10, 10, 10},
                 },
                 _attached_player = nil,
                 on_step = function(self)
@@ -519,7 +520,7 @@ minetest.register_entity(prefix .. "balloon", {
 					for i = 1, 2 do
                                         	minetest.add_particle({
                                         	        pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.6, math.random(-15, 15) / 100),
-                                        	        velocity = vector.offset(balloon:get_velocity(), 0, 2, 0),
+                                        	        velocity = vector.offset(balloon:get_velocity(), -0.3, 3, 0),
                                         	        expirationtime = 0.3,
                                         	        size = math.random(1, 10) / 20,
                                         	        texture = color_to_texture(math.random(1, 4)),
@@ -531,14 +532,16 @@ minetest.register_entity(prefix .. "balloon", {
 
                                 local sand_drive = self._sand_drive
                                 if sand_drive > 0 then
-                                        minetest.add_particle({
-                                                pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.5, math.random(-15, 15) / 100),
-                                                velocity = vector.offset(balloon:get_velocity(), 0, -2, 0),
-                                                expirationtime = 0.3,
-                                                size = math.random(1, 10) / 20,
-                                                texture = color_to_texture(table_random({1, 6, 15, 16})),
-                                                playername = player_name,
-                                        })
+					for i = 1, sand_drive do
+                                        	minetest.add_particle({
+                                        	        pos = vector.offset(balloon:get_pos(), math.random(-20, 20) / 100, balloon_scale / 2 - 2, math.random(-20, 20) / 100),
+                                        	        velocity = vector.offset(balloon:get_velocity(), math.random(-5, 5) / 10, -1, math.random(-5, 5) / 10),
+                                        	        expirationtime = 1,
+                                        	        size = math.random(1, 10) / 15,
+                                        	        texture = color_to_texture(table_random({1, 6, 15, 16})),
+                                        	        playername = player_name,
+                                        	})
+					end
                                         vy = sand_drive * 2
                                 end
 
@@ -570,7 +573,7 @@ minetest.register_entity(prefix .. "balloon", {
                                 end
 
                                 local radius = balloon_scale / 2
-                                for _, obj in pairs(minetest.get_objects_inside_radius(vector.offset(balloon_pos, 0, radius, 0), radius + 2)) do
+                                for _, obj in pairs(minetest.get_objects_inside_radius(vector.offset(balloon_pos, 0, radius, 0), radius + 2.5)) do
                                         local ent = obj:get_luaentity()
                                         if ent then
                                                 local ename = ent.name

@@ -623,6 +623,19 @@ minetest.register_entity(prefix .. "balloon", {
                                         end
                                 end
 
+				if balloon_pos.x >= 60 and not balloon:get_properties().physical and minetest.get_node(balloon_pos).name == "air" then
+					self.object:set_properties({
+						physical = true,
+					})
+				elseif moveresult then
+					for _, collision in pairs(moveresult.collisions) do
+						if minetest.get_node(collision.node_pos).name ~= "" then
+							p_set(player, "status", "counting")
+							break
+						end
+					end
+				end
+
                         elseif status == "counting" then
                                 local counting = p_get(player, "counting")
                                 if not p_get(player, "hud").counter then
@@ -652,19 +665,6 @@ minetest.register_entity(prefix .. "balloon", {
                                 if control.jump then
                                         p_set(player, "status", "running")
                                         player:hud_remove(players[player].hud.paused)
-                                end
-                        end
-
-                        if balloon_pos.x >= 60 and not balloon:get_properties().physical and minetest.get_node(balloon_pos).name == "air" then
-                                self.object:set_properties({
-                                        physical = true,
-                                })
-                        elseif moveresult then
-                                for _, collision in pairs(moveresult.collisions) do
-                                        if minetest.get_node(collision.node_pos).name ~= "" then
-                                                p_set(player, "status", "counting")
-                                                break
-                                        end
                                 end
                         end
 

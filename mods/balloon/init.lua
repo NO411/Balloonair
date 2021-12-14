@@ -366,6 +366,7 @@ local function pause_game(player, balloon)
 	remove_sand_drive(b_ent, true)
 	players[player].boosts = {
 		gas = 0,
+		shield = 0,
 		sand = {0, 0, 0, 0}
 	}
 	local boost_hud = p_get(player, "hud").boosts

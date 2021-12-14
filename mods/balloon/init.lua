@@ -237,7 +237,8 @@ local function set_environment(player)
 	})
 	player:hud_set_hotbar_image("blank.png")
 	player:hud_set_hotbar_selected_image("balloon_hotbar_selected.png")
-	player:hud_set_hotbar_itemcount(2)
+	player:hud_set_hotbar_itemcount(3)
+	player:get_inventory():set_size("main", 3)
 	player:set_sun({
 		sunrise_visible = false,
 	})
@@ -265,7 +266,6 @@ local function set_environment(player)
 		"- Dig: use the selected item\n" ..
 		"- Escape: pause game]"
 	)
-	player:get_inventory():set_size("main", 2)
 end
 
 local function reset_pos(obj)
@@ -322,6 +322,20 @@ local function remove_gas_drive(b_ent)
 	})
 end
 
+local function remove_shield_drive(b_ent)
+	b_ent._shield_drive = false
+	b_ent.object:set_properties({
+		physical = true,
+	})
+	local player = b_ent._balloonist
+	local boost_hud = p_get(player, "hud").boosts
+	local shield_hud = boost_hud.shield
+	if shield_hud and player:hud_get(shield_hud) then
+		player:hud_remove(shield_hud)
+		player:hud_remove(boost_hud.images[6])
+	end
+end
+
 local function remove_sand_drive(b_ent, all, sandbag)
 	if all then
 		b_ent._sand_drive = 0
@@ -343,11 +357,10 @@ local function pause_game(player, balloon)
 	p_set(player, "status", "paused")
 	add_paused_screen(player)
 	reset_pos(balloon)
-	balloon:set_properties({
-		physical = false,
-	})
-	player:get_inventory():set_stack("main", 1, {name = prefix .. "gasbottle_item", count = 1})
-	player:get_inventory():set_stack("main", 2, {name = prefix .. "sandbag_item", count = 2})
+	local inv = player:get_inventory()
+	inv:set_stack("main", 1, {name = prefix .. "gasbottle_item", count = 1})
+	inv:set_stack("main", 2, {name = prefix .. "shield_coin_item", count = 1})
+	inv:set_stack("main", 3, {name = prefix .. "sandbag_item", count = 2})
 	local b_ent = balloon:get_luaentity()
 	remove_gas_drive(b_ent)
 	remove_sand_drive(b_ent, true)
@@ -358,9 +371,9 @@ local function pause_game(player, balloon)
 	local boost_hud = p_get(player, "hud").boosts
 	local gas_hud = boost_hud.gas
 	if gas_hud and player:hud_get(gas_hud) then
-		player:hud_remove(boost_hud.gas)
+		player:hud_remove(gas_hud)
 	end
-	for i = 1, 5 do
+	for i = 1, 6 do
 		if i < 5 then
 			local sand_hud = boost_hud.sand[i] 
 			if sand_hud and player:hud_get(sand_hud) then
@@ -373,6 +386,10 @@ local function pause_game(player, balloon)
 			player:hud_remove(boost_hud.images[i])
 		end
 	end
+
+	balloon:set_properties({
+		physical = false,
+	})
 end
 
 minetest.register_craftitem(prefix .. "gasbottle_item", {
@@ -408,6 +425,43 @@ minetest.register_craftitem(prefix .. "gasbottle_item", {
 				z_index = 0,
 			})
 			play_sound("gas", 2, user)
+		end
+		return itemstack
+	end,
+})
+
+minetest.register_craftitem(prefix .. "shield_coin_item", {
+	inventory_image = "balloon_shield.png",
+	on_use = function(itemstack, user, pointed_thing)
+		local balloon = p_get(user, "balloon")
+		local b_ent = balloon:get_luaentity()
+		if not b_ent._shield_drive and p_get(user, "status") == "running" then
+			b_ent._shield_drive = true
+			itemstack:take_item()
+			p_get(user, "boosts").shield = 10
+			p_get(user, "hud").boosts.shield = user:hud_add({
+				hud_elem_type = "text",
+				position = {x = 1, y = 0.35},
+				offset = {x = -20, y = 0},
+				alignment = {x = -1, y = 1},
+				text = "10",
+				number = 0x4B726E,
+				z_index = 0,
+				style = 1,
+			})
+			p_get(user, "hud").boosts.images[6] = user:hud_add({
+				hud_elem_type = "image",
+				position = {x = 1, y = 0.35},
+				alignment = {x = -1, y = 1},
+				scale = {x = 1.5, y = 1.5},
+				offset = {x = -40, y = -2},
+				text = "balloon_shield.png",
+				z_index = 0,
+			})
+			balloon:set_properties({
+				physical = false,
+			})
+			play_sound("use_shield", 1, user)
 		end
 		return itemstack
 	end,
@@ -460,7 +514,7 @@ minetest.register_craftitem(prefix .. "sandbag_item", {
 })
 
 local spawn_entities = {}
-local function register_spawn_entity(name, scale, texture, rotation, spawn, extras)
+local function register_spawn_entity(name, scale, texture, rotation, spawn, extras, init_extras)
 	local properties = {
 		initial_properties = {
 			visual = "mesh",
@@ -495,6 +549,12 @@ local function register_spawn_entity(name, scale, texture, rotation, spawn, extr
 		end
 	end
 
+	if init_extras then
+		for setting, value in pairs(init_extras) do
+			properties.initial_properties[setting] = value
+		end
+	end
+
 	local ent_name = prefix .. name
 	if spawn then
 		table.insert(spawn_entities, ent_name)
@@ -506,6 +566,7 @@ local function register_spawn_entity(name, scale, texture, rotation, spawn, extr
 end
 
 register_spawn_entity("coin", 15, "balloon_coin.png", true, true)
+register_spawn_entity("shield_coin", 15, "balloon_shield_coin.png", 1, true, nil, {mesh = "balloon_coin.obj"})
 register_spawn_entity("bird", 10, "", false, true, {
 	on_activate = function(self)
 		self.object:set_properties({
@@ -538,6 +599,7 @@ minetest.register_entity(prefix .. "balloon", {
 	_gasbottle = nil,
 	_sandbags = {nil},
 	_bird_drive = false,
+	_shield_drive = false,
 	_spawn_pos = {y = 0, z = 0},
 	on_step = function(self, dtime, moveresult)
 		for n, _ in pairs(timers) do
@@ -576,6 +638,19 @@ minetest.register_entity(prefix .. "balloon", {
 						else
 							boosts.gas = gas_seconds - 1
 							player:hud_change(gas_hud, "text", boosts.gas)
+						end
+					end
+
+					if self._shield_drive then
+						local shield_seconds = boosts.shield
+						local shield_hud = hud.boosts.shield
+						if shield_seconds == 0 then
+							remove_shield_drive(self)
+							player:hud_remove(shield_hud)
+							player:hud_remove(boost_hud.images[6])
+						else
+							boosts.shield = shield_seconds - 1
+							player:hud_change(shield_hud, "text", boosts.shield)
 						end
 					end
 
@@ -682,14 +757,19 @@ minetest.register_entity(prefix .. "balloon", {
 						local ename = ent.name
 						if ename ~= prefix .. "balloon" and ename ~= prefix .. "balloon_gasbottle" and ename ~= prefix .. "balloon_sandbag" then
 							if ename == prefix .. "bird" then
-								minetest.sound_play({name = "balloon_bird" .. math.random(1, 3), gain = 1.0, pitch = 1.0}, {to_player = player_name, object = obj}, true)
-								minetest.sound_play({name = "balloon_sink" .. math.random(1, 2), gain = 1.0, pitch = 1.0}, {to_player = player:get_player_name()}, true)
-								self._bird_drive = true
-								minetest.after(2, function()
-									if player and self._bird_drive then
-										self._bird_drive = false
-									end
-								end)
+								play_sound("bird", 3, player)
+								if not self._shield_drive then
+									play_sound("sink", 2, player)
+									self._bird_drive = true
+									minetest.after(1.5, function()
+										if player and self._bird_drive then
+											self._bird_drive = false
+										end
+									end)
+								else
+									remove_shield_drive(self)
+									play_sound("remove_shield", 1, player)
+								end
 							else
 								play_sound("collect", 1, player)
 							end
@@ -702,11 +782,12 @@ minetest.register_entity(prefix .. "balloon", {
 										hud_elem_type = "text",
 										position = {x = 0.75, y = 0.5},
 										text = "+100",
+										size = {x = 2, y = 2},
 										number = 0x4B726E,
 										z_index = 0,
 										style = 1,
 									})
-									minetest.after(1, function()
+									minetest.after(1.2, function()
 										if player then
 											player:hud_remove(hud.bonus_points)
 											hud.bonus_points = nil
@@ -718,7 +799,7 @@ minetest.register_entity(prefix .. "balloon", {
 									local value = tonumber(string.sub(text, 2, 2)) + 1
 									player:hud_change(bonus_hud, "text", "+" .. value .. "00")
 								end
-							elseif ename == prefix .. "sandbag" or ename == prefix .. "gasbottle" then
+							elseif ename == prefix .. "sandbag" or ename == prefix .. "gasbottle" or ename == prefix .. "shield_coin" then
 								player:get_inventory():add_item("main", {name = ename .. "_item"})
 							end
 							obj:move_to(balloon_pos)
@@ -736,11 +817,11 @@ minetest.register_entity(prefix .. "balloon", {
 					})
 				end
 
-				if balloon_pos.x >= 60 and not balloon:get_properties().physical and minetest.get_node(balloon_pos).name == "air" then
+				if not self._shield_drive and balloon_pos.x >= 60 and not balloon:get_properties().physical and minetest.get_node(balloon_pos).name == "air" then
 					self.object:set_properties({
 						physical = true,
 					})
-				elseif moveresult then
+				elseif moveresult and not self._shield_drive then
 					for _, collision in pairs(moveresult.collisions) do
 						if minetest.get_node(collision.node_pos).name ~= "" then
 							p_set(player, "status", "counting")
@@ -821,6 +902,7 @@ minetest.register_on_joinplayer(function(player)
 		balloon = nil,
 		boosts = {
 			gas = 0,
+			shield = 0,
 			sand = {0, 0, 0, 0},
 		}
 	}
@@ -844,8 +926,9 @@ minetest.register_on_joinplayer(function(player)
 		}),
 		boosts = {
 			gas = nil,
+			shield = nil,
 			sand = {nil, nil, nil, nil},
-			images = {nil, nil, nil, nil},
+			images = {nil, nil, nil, nil, nil, nil},
 		},
 	}
 	local balloon = minetest.add_entity(player:get_pos(), prefix .. "balloon"):get_luaentity()

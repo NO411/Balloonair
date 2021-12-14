@@ -43,6 +43,10 @@ local function table_random(t)
 	return t[math.random(#t)]
 end
 
+local function play_sound(sound, max, player)
+	minetest.sound_play({name = "balloon_" .. sound .. math.random(1, max), gain = 1.0, pitch = 1.0}, {to_player = player:get_player_name()}, true)
+end
+
 minetest.register_node(prefix .. 13, {
 	drawtype = "liquid",
 	pointable = false,
@@ -403,7 +407,7 @@ minetest.register_craftitem(prefix .. "gasbottle_item", {
 				text = "balloon_gasbottle.png",
 				z_index = 0,
 			})
-			minetest.sound_play({name = "balloon_gas" .. math.random(1, 2), gain = 1.0, pitch = 1.0}, {to_player = user:get_player_name()}, true)
+			play_sound("gas", 2, user)
 		end
 		return itemstack
 	end,
@@ -449,7 +453,7 @@ minetest.register_craftitem(prefix .. "sandbag_item", {
 			end
 
 			itemstack:take_item()
-			minetest.sound_play({name = "balloon_sand" .. math.random(1, 2), gain = 1.0, pitch = 1.0}, {to_player = user:get_player_name()}, true)
+			play_sound("sand", 2, user)
 		end
 		return itemstack
 	end,
@@ -687,7 +691,7 @@ minetest.register_entity(prefix .. "balloon", {
 									end
 								end)
 							else
-								minetest.sound_play({name = "balloon_collect", gain = 1.0, pitch = 1.0}, {to_player = player_name, object = obj}, true)
+								play_sound("collect", 1, player)
 							end
 
 							if ename == prefix .. "coin" then

@@ -546,7 +546,7 @@ minetest.register_entity(prefix .. "balloon", {
 			local control = player:get_player_control()
 			local status = p_get(player, "status")
 			local balloon_pos = balloon:get_pos()
-
+			local hud = p_get(player, "hud")
 			if timers.environment >= 30 then
 				set_random_sky(player)
 				timers.environment = 0
@@ -561,10 +561,10 @@ minetest.register_entity(prefix .. "balloon", {
 
 				local sand_drive = self._sand_drive
 				if timers.seconds >= 1 then
-					local boost_hud = p_get(player, "hud").boosts
+					local boost_hud = hud.boosts
 					if self._gas_drive then
 						local gas_seconds = boosts.gas
-						local gas_hud = p_get(player, "hud").boosts.gas
+						local gas_hud = hud.boosts.gas
 						if gas_seconds == 0 then
 							remove_gas_drive(self)
 							player:hud_remove(gas_hud)
@@ -578,7 +578,7 @@ minetest.register_entity(prefix .. "balloon", {
 					if sand_drive > 0 then
 						for i = 1, 4 do
 							local sandbag = self._sandbags[i]
-							local sand_hud = p_get(player, "hud").boosts.sand[i]
+							local sand_hud = hud.boosts.sand[i]
 							if sandbag:get_properties().is_visible then
 								local sand_seconds = boosts.sand[i]
 								if sand_seconds == 0 then
@@ -694,7 +694,7 @@ minetest.register_entity(prefix .. "balloon", {
 								p_set(player, "coin_points", p_get(player, "coin_points") + 100)
 								local bonus_hud = p_get(player, "hud").bonus_points
 								if not bonus_hud then
-									players[player].hud.bonus_points = player:hud_add({
+									hud.bonus_points = player:hud_add({
 										hud_elem_type = "text",
 										position = {x = 0.75, y = 0.5},
 										text = "+100",
@@ -704,8 +704,8 @@ minetest.register_entity(prefix .. "balloon", {
 									})
 									minetest.after(1, function()
 										if player then
-											player:hud_remove(p_get(player, "hud").bonus_points)
-											players[player].hud.bonus_points = nil
+											player:hud_remove(hud.bonus_points)
+											hud.bonus_points = nil
 										end
 									end)
 								else
@@ -723,7 +723,7 @@ minetest.register_entity(prefix .. "balloon", {
 					end
 				end
 
-				local bonus_hud = p_get(player, "hud").bonus_points
+				local bonus_hud = hud.bonus_points
 				if bonus_hud and player:hud_get(bonus_hud) then
 					local get_bonus_hud = player:hud_get(bonus_hud)
 					player:hud_change(bonus_hud, "position", {
@@ -747,8 +747,8 @@ minetest.register_entity(prefix .. "balloon", {
 
 			elseif status == "counting" then
 				local counting = p_get(player, "counting")
-				if not p_get(player, "hud").counter then
-					players[player].hud.counter = player:hud_add({
+				if not hud.counter then
+					hud.counter = player:hud_add({
 						hud_elem_type = "text",
 						position = {x = 0.5, y = 0.5},
 						text = counting,
@@ -762,18 +762,18 @@ minetest.register_entity(prefix .. "balloon", {
 					pause_game(player, balloon)
 					player:hud_remove(p_get(player, "hud").counter)
 					p_set(player, "counting", 5)
-					players[player].hud.counter = nil
+					hud.counter = nil
 				else
 					if timers.counter >= 0.5 then
 						p_set(player, "counting", counting - 1)
-						player:hud_change(p_get(player, "hud").counter, "text", counting)
+						player:hud_change(hud.counter, "text", counting)
 						timers.counter = 0
 					end
 				end
 			elseif status == "paused" then
 				if control.jump then
 					p_set(player, "status", "running")
-					player:hud_remove(players[player].hud.paused)
+					player:hud_remove(p_get(player, "hud").paused)
 				end
 			end
 
@@ -810,7 +810,6 @@ minetest.register_on_joinplayer(function(player)
 
 	players[player] = {
 		status = "paused",
-		-- "paused", "running", "counting"
 		score = 0,
 		coin_points = 0,
 		counting = 5,

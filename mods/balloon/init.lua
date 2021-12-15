@@ -202,16 +202,6 @@ local function set_random_sky(player)
 	})
 end
 
-local timers = {
-	environment = 0,
-	balloon = 0,
-	score = 0,
-	counter = 0,
-	spawn_objects = 0,
-	change_spawn_pos = 0,
-	seconds = 0,
-}
-
 local players = {}
 
 local function p_get(p, v)
@@ -268,9 +258,16 @@ local function set_environment(player)
 	)
 end
 
-local function reset_pos(obj)
-	obj:move_to(vector.new(0, 100, 0))
-	obj:set_velocity(vector.new(0, 0, 0))
+local function reset_pos(balloon)
+	local player = balloon:get_luaentity()._balloonist
+	local n_player
+	for n, p in pairs(minetest.get_connected_players()) do
+		if player == p then
+			n_player = n
+		end
+	end
+	balloon:move_to(vector.new(0, 100, 50 * n_player - 50))
+	balloon:set_velocity(vector.new(0, 0, 0))
 end
 
 
@@ -329,15 +326,16 @@ local function remove_shield_drive(b_ent)
 	})
 	local player = b_ent._balloonist
 	local boost_hud = p_get(player, "hud").boosts
-	local shield_hud = boost_hud.shield
+	local shield_hud = boost_hud.counters[6]
 	if shield_hud and player:hud_get(shield_hud) then
 		player:hud_remove(shield_hud)
 		player:hud_remove(boost_hud.images[6])
 	end
 end
 
-local function remove_sand_drive(b_ent, all, sandbag)
+local function remove_sand_drive(b_ent, all, sandbag, i)
 	if all then
+		b_ent._sand_drives = {false, false, false, false}
 		b_ent._sand_drive = 0
 		for _, obj in pairs(b_ent._sandbags) do
 			obj:set_properties({
@@ -346,6 +344,7 @@ local function remove_sand_drive(b_ent, all, sandbag)
 		end
 	elseif sandbag then
 		b_ent._sand_drive = b_ent._sand_drive - 1
+		b_ent._sand_drives[i] = false
 		sandbag:set_properties({
 			is_visible = false,
 		})
@@ -357,39 +356,69 @@ local function pause_game(player, balloon)
 	p_set(player, "status", "paused")
 	add_paused_screen(player)
 	reset_pos(balloon)
+
 	local inv = player:get_inventory()
 	inv:set_stack("main", 1, {name = prefix .. "gasbottle_item", count = 1})
 	inv:set_stack("main", 2, {name = prefix .. "shield_coin_item", count = 1})
 	inv:set_stack("main", 3, {name = prefix .. "sandbag_item", count = 2})
+
 	local b_ent = balloon:get_luaentity()
+	b_ent._speed = 0
+
 	remove_gas_drive(b_ent)
 	remove_sand_drive(b_ent, true)
-	players[player].boosts = {
-		gas = 0,
-		shield = 0,
-		sand = {0, 0, 0, 0}
-	}
+	remove_shield_drive(b_ent)
+
+	players[player].boosts = {0, 0, 0, 0, 0, 0}
+
 	local boost_hud = p_get(player, "hud").boosts
-	local gas_hud = boost_hud.gas
+	local gas_hud = boost_hud.counters[1]
 	if gas_hud and player:hud_get(gas_hud) then
 		player:hud_remove(gas_hud)
 	end
+	
 	for i = 1, 6 do
-		if i < 5 then
-			local sand_hud = boost_hud.sand[i] 
-			if sand_hud and player:hud_get(sand_hud) then
-				player:hud_remove(boost_hud.sand[i])
-			end
-		end
-
 		local boost_image_hud = boost_hud.images[i]
 		if boost_image_hud and player:hud_get(boost_image_hud) then
 			player:hud_remove(boost_hud.images[i])
 		end
 	end
 
+	for i = 2, 5 do
+		local sand_hud = boost_hud.counters[i] 
+		if sand_hud and player:hud_get(sand_hud) then
+			player:hud_remove(sand_hud)
+		end
+	end
+
 	balloon:set_properties({
 		physical = false,
+	})
+end
+
+local function add_boost_image(player, image, i)
+	p_get(player, "hud").boosts.images[i] = player:hud_add({
+		hud_elem_type = "image",
+		position = {x = 1, y = 0.05 + 0.05 * i},
+		alignment = {x = -1, y = 1},
+		scale = {x = 1.5, y = 1.5},
+		offset = {x = -40, y = -2},
+		text = "balloon_" .. image .. ".png",
+		z_index = 0,
+	})
+end
+
+local function add_boost_counter(player, i)
+	p_get(player, "boosts")[i] = 10
+	p_get(player, "hud").boosts.counters[i] = player:hud_add({
+		hud_elem_type = "text",
+		position = {x = 1, y = 0.05 + 0.05 * i},
+		offset = {x = -20, y = 0},
+		alignment = {x = -1, y = 1},
+		text = "10",
+		number = 0x4B726E,
+		z_index = 0,
+		style = 1,
 	})
 end
 
@@ -405,26 +434,8 @@ minetest.register_craftitem(prefix .. "gasbottle_item", {
 			gasbottle:set_properties({
 				is_visible = true
 			})
-			p_get(user, "boosts").gas = 10
-			p_get(user, "hud").boosts.gas = user:hud_add({
-				hud_elem_type = "text",
-				position = {x = 1, y = 0.1},
-				offset = {x = -20, y = 0},
-				alignment = {x = -1, y = 1},
-				text = "10",
-				number = 0x4B726E,
-				z_index = 0,
-				style = 1,
-			})
-			p_get(user, "hud").boosts.images[1] = user:hud_add({
-				hud_elem_type = "image",
-				position = {x = 1, y = 0.1},
-				alignment = {x = -1, y = 1},
-				scale = {x = 1.5, y = 1.5},
-				offset = {x = -40, y = -2},
-				text = "balloon_gasbottle.png",
-				z_index = 0,
-			})
+			add_boost_counter(user, 1)
+			add_boost_image(user, "gasbottle", 1)
 			play_sound("gas", 2, user)
 		end
 		return itemstack
@@ -439,26 +450,8 @@ minetest.register_craftitem(prefix .. "shield_coin_item", {
 		if not b_ent._shield_drive and p_get(user, "status") == "running" then
 			b_ent._shield_drive = true
 			itemstack:take_item()
-			p_get(user, "boosts").shield = 10
-			p_get(user, "hud").boosts.shield = user:hud_add({
-				hud_elem_type = "text",
-				position = {x = 1, y = 0.35},
-				offset = {x = -20, y = 0},
-				alignment = {x = -1, y = 1},
-				text = "10",
-				number = 0x4B726E,
-				z_index = 0,
-				style = 1,
-			})
-			p_get(user, "hud").boosts.images[6] = user:hud_add({
-				hud_elem_type = "image",
-				position = {x = 1, y = 0.35},
-				alignment = {x = -1, y = 1},
-				scale = {x = 1.5, y = 1.5},
-				offset = {x = -40, y = -2},
-				text = "balloon_shield.png",
-				z_index = 0,
-			})
+			add_boost_counter(user, 6)
+			add_boost_image(user, "shield", 6)
 			balloon:set_properties({
 				physical = false,
 			})
@@ -475,34 +468,15 @@ minetest.register_craftitem(prefix .. "sandbag_item", {
 		local b_ent = balloon:get_luaentity()
 		local sand_drive = b_ent._sand_drive
 		if sand_drive < 4 and p_get(user, "status") == "running" then
-
 			b_ent._sand_drive = sand_drive + 1
-			local sandbag
-			for i, obj in pairs(b_ent._sandbags) do
-				if b_ent._sandbags and not obj:get_properties().is_visible then
-					obj:set_properties({
+			for i, drive in pairs(b_ent._sand_drives) do
+				if not drive then
+					b_ent._sandbags[i]:set_properties({
 						is_visible = true,
 					})
-					p_get(user, "boosts").sand[i] = 10
-					p_get(user, "hud").boosts.sand[i] = user:hud_add({
-						hud_elem_type = "text",
-						position = {x = 1, y = 0.1 + 0.05 * i},
-						offset = {x = -20, y = 0},
-						alignment = {x = -1, y = 1},
-						text = "10",
-						number = 0x4B726E,
-						z_index = 0,
-						style = 1,
-					})
-					p_get(user, "hud").boosts.images[i + 1] = user:hud_add({
-						hud_elem_type = "image",
-						position = {x = 1, y = 0.1 + 0.05 * i},
-						alignment = {x = -1, y = 1},
-						scale = {x = 1.5, y = 1.5},
-						offset = {x = -40, y = -2},
-						text = "balloon_sandbag.png",
-						z_index = 0,
-					})
+					b_ent._sand_drives[i] = true
+					add_boost_counter(user, i + 1)
+					add_boost_image(user, "sandbag", i + 1)
 					break
 				end
 			end
@@ -565,13 +539,12 @@ local function register_spawn_entity(name, scale, texture, probability, rotation
 		properties.initial_properties.is_visible = false
 	end
 	minetest.register_entity(ent_name, properties)
-
 end
 
-register_spawn_entity("coin", 15, "balloon_coin.png", 0.6, true, true)
+register_spawn_entity("coin", 15, "balloon_coin.png", 0.5, true, true)
 register_spawn_entity("shield_coin", 15, "balloon_shield_coin.png", 0.05, 10, true, nil, {mesh = "balloon_coin.obj"})
 
-register_spawn_entity("bird", 10, "", probability,false, true, {
+register_spawn_entity("bird", 10, "", 0.25, false, true, {
 	on_activate = function(self)
 		self.object:set_properties({
 			textures = {color_to_texture(random_color())},
@@ -581,12 +554,271 @@ register_spawn_entity("bird", 10, "", probability,false, true, {
 })
 
 register_spawn_entity("gasbottle", 10, color_to_texture(3), 0.1, true, true)
-register_spawn_entity("sandbag", 10, color_to_texture(8), 0.25, true, true)
+register_spawn_entity("sandbag", 10, color_to_texture(8), 0.1, true, true)
 
 register_spawn_entity("balloon_gasbottle", 1, color_to_texture(3), nil, 0.1)
 register_spawn_entity("balloon_sandbag", 1, color_to_texture(8), nil, 0.1)
 
 local balloon_scale = 3
+
+local function main_loop(self, balloon, player, timers, moveresult)
+	local player_name = player:get_player_name()
+	local control = player:get_player_control()
+	local status = p_get(player, "status")
+	local balloon_pos = balloon:get_pos()
+	local hud = p_get(player, "hud")
+	if timers.environment >= 30 then
+		set_random_sky(player)
+		timers.environment = 0
+	end
+
+	if status == "running" then
+		local boosts = p_get(player, "boosts")
+
+		if timers.score >= 0.5 then
+			p_set(player, "score", math.floor(balloon_pos.x + 0.5))
+		end
+
+		local sand_drive = self._sand_drive
+		if timers.seconds >= 1 then
+			local boost_hud = hud.boosts
+			if self._gas_drive then
+				local gas_seconds = boosts[1]
+				local gas_hud = boost_hud.counters[1]
+				if gas_seconds == 0 then
+					remove_gas_drive(self)
+					player:hud_remove(gas_hud)
+					player:hud_remove(boost_hud.images[1])
+				else
+					player:hud_change(gas_hud, "text", gas_seconds)
+					boosts[1] = gas_seconds - 1
+				end
+			end
+
+			if self._shield_drive then
+				local shield_seconds = boosts[6]
+				local shield_hud = boost_hud.counters[6]
+				if shield_seconds == 0 then
+					remove_shield_drive(self)
+				else
+					player:hud_change(shield_hud, "text", shield_seconds)
+					boosts[6] = shield_seconds - 1
+				end
+			end
+
+			for i = 2, 5 do
+				local sandbag = self._sandbags[i - 1]
+				if self._sand_drives[i - 1] then
+					local sand_hud = boost_hud.counters[i]
+					local sand_seconds = boosts[i]
+					if sand_seconds == 0 then
+						player:hud_remove(sand_hud)
+						player:hud_remove(boost_hud.images[i])
+						remove_sand_drive(self, false, sandbag, i - 1)
+					else
+						player:hud_change(sand_hud, "text", sand_seconds)
+						boosts[i] = sand_seconds - 1
+					end
+				end
+			end
+			timers.seconds = 0
+		end
+
+		local vx, vy, vz = 10, -1, 0
+		if control.left then
+			vz = 20
+		elseif control.right then
+			vz = -20
+		else
+			vx = 20
+		end
+		if self._gas_drive then
+			for i = 1, 2 do
+				minetest.add_particle({
+					pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.6, math.random(-15, 15) / 100),
+					velocity = vector.offset(balloon:get_velocity(), -0.3, 3, 0),
+					expirationtime = 0.3,
+					size = math.random(1, 10) / 20,
+					texture = color_to_texture(math.random(1, 4)),
+					playername = player_name,
+				})
+			end
+			vx = vx + 30
+		end
+
+		if sand_drive > 0 then
+			for i = 1, sand_drive do
+				minetest.add_particle({
+					pos = vector.offset(balloon:get_pos(), math.random(-20, 20) / 100, balloon_scale / 2 - 2, math.random(-20, 20) / 100),
+					velocity = vector.offset(balloon:get_velocity(), math.random(-5, 5) / 10, -1, math.random(-5, 5) / 10),
+					expirationtime = 1,
+					size = math.random(1, 10) / 15,
+					texture = color_to_texture(table_random({1, 6, 15, 16})),
+					playername = player_name,
+				})
+			end
+			vy = sand_drive * 2
+		end
+
+		if control.down then
+			vy = -10
+		end
+
+		if self._bird_drive then
+			vy = vy - 20
+		end
+
+		local _speed = self._speed
+		if timers.speed >= 1 * _speed then
+			self._speed = _speed + 0.01
+		end
+
+		balloon:set_velocity(vector.new(vx + _speed, vy, vz))
+
+		if control.aux1 then
+			pause_game(player, balloon)
+		end
+
+		if timers.change_spawn_pos > 3 then
+			self._spawn_pos = {y = balloon_pos.y + math.random(-10, 10), z = balloon_pos.z + math.random(-20, 20)}
+			timers.change_spawn_pos = 0
+		end
+
+		if timers.spawn_objects >= 0.7 then
+			local _pos = self._spawn_pos
+			local x = balloon_pos.x + 90
+			if math.random(1, 10) == 1 then
+				for i = -2, 2 do
+					local pos = vector.new(x, _pos.y, _pos.z + i * 8)
+					if minetest.get_node(pos).name == "air" then
+						minetest.add_entity(pos, table_random(spawn_entities)):get_luaentity()._attached_player = player
+					end
+				end
+			else
+				local pos = vector.new(x, _pos.y, _pos.z)
+				if minetest.get_node(pos).name == "air" then
+					minetest.add_entity(pos, table_random(spawn_entities)):get_luaentity()._attached_player = player
+				end
+			end
+			
+			timers.spawn_objects = 0
+		end
+
+		local radius = balloon_scale / 2
+		for _, obj in pairs(minetest.get_objects_inside_radius(vector.offset(balloon_pos, 0, radius, 0), radius + 2.5)) do
+			local ent = obj:get_luaentity()
+			if ent then
+				local ename = ent.name
+				if ename ~= prefix .. "balloon" and ename ~= prefix .. "balloon_gasbottle" and ename ~= prefix .. "balloon_sandbag" then
+					if ename == prefix .. "bird" then
+						play_sound("bird", 3, player)
+						if not self._shield_drive then
+							play_sound("sink", 2, player)
+							self._bird_drive = true
+							minetest.after(1.5, function()
+								if player and self._bird_drive then
+									self._bird_drive = false
+								end
+							end)
+						else
+							remove_shield_drive(self)
+							play_sound("remove_shield", 1, player)
+						end
+					else
+						play_sound("collect", 1, player)
+					end
+					if ename == prefix .. "coin" then
+						p_set(player, "coin_points", p_get(player, "coin_points") + 10)
+						local bonus_hud = p_get(player, "hud").bonus_points
+						if not bonus_hud then
+							hud.bonus_points = player:hud_add({
+								hud_elem_type = "text",
+								position = {x = 0.75, y = 0.5},
+								text = "+10",
+								size = {x = 2, y = 2},
+								number = 0x4B726E,
+								z_index = 0,
+								style = 1,
+							})
+							minetest.after(1.2, function()
+								if player then
+									player:hud_remove(hud.bonus_points)
+									hud.bonus_points = nil
+								end
+							end)
+						else
+							local get_bonus_hud = player:hud_get(bonus_hud)
+							if get_bonus_hud then
+								local text = get_bonus_hud.text
+								local value = tonumber(string.sub(text, 2, 2)) + 1
+								player:hud_change(bonus_hud, "text", "+" .. value .. "0")
+							end
+						end
+					elseif ename == prefix .. "sandbag" or ename == prefix .. "gasbottle" or ename == prefix .. "shield_coin" then
+						player:get_inventory():add_item("main", {name = ename .. "_item"})
+					end
+					obj:move_to(balloon_pos)
+					obj:remove()
+				end
+			end
+		end
+
+		local bonus_hud = hud.bonus_points
+		if bonus_hud and player:hud_get(bonus_hud) then
+			local get_bonus_hud = player:hud_get(bonus_hud)
+			player:hud_change(bonus_hud, "position", {
+				x = get_bonus_hud.position.x + 0.002,
+				y = get_bonus_hud.position.y - 0.005,
+			})
+		end
+
+		if not self._shield_drive and balloon_pos.x >= 60 and not balloon:get_properties().physical and minetest.get_node(balloon_pos).name == "air" then
+			self.object:set_properties({
+				physical = true,
+			})
+		elseif moveresult and not self._shield_drive then
+			for _, collision in pairs(moveresult.collisions) do
+				if minetest.get_node(collision.node_pos).name ~= "" then
+					p_set(player, "status", "counting")
+					break
+				end
+			end
+		end
+
+	elseif status == "counting" then
+		local counting = p_get(player, "counting")
+		if not hud.counter then
+			hud.counter = player:hud_add({
+				hud_elem_type = "text",
+				position = {x = 0.5, y = 0.5},
+				text = counting,
+				number = 0x4B726E,
+				size = {x = 5, y = 5},
+				z_index = 0,
+				style = 1,
+			})
+			balloon:set_velocity(vector.new(0, 0, 0))
+		elseif counting < 0 then
+			pause_game(player, balloon)
+			player:hud_remove(p_get(player, "hud").counter)
+			p_set(player, "counting", 5)
+			hud.counter = nil
+		else
+			if timers.counter >= 0.5 then
+				p_set(player, "counting", counting - 1)
+				player:hud_change(hud.counter, "text", counting)
+				timers.counter = 0
+			end
+		end
+	elseif status == "paused" then
+		if control.jump then
+			p_set(player, "status", "running")
+			player:hud_remove(p_get(player, "hud").paused)
+		end
+	end
+	update_score_hud(player)
+end
+
 minetest.register_entity(prefix .. "balloon", {
 	initial_properties = {
 		visual = "mesh",
@@ -600,275 +832,32 @@ minetest.register_entity(prefix .. "balloon", {
 		visual_size = vector.new(balloon_scale, balloon_scale, balloon_scale),
 	},
 	_balloonist = nil,
+
 	_gas_drive = false,
-	_sand_drive = 0,
 	_gasbottle = nil,
+
+	_sand_drive = 0,
+	_sand_drives = {false, false, false, false},
 	_sandbags = {nil},
+
 	_bird_drive = false,
+
 	_shield_drive = false,
+	
 	_spawn_pos = {y = 0, z = 0},
+	_speed = 0,
 	on_step = function(self, dtime, moveresult)
-		for n, _ in pairs(timers) do
-			timers[n] = timers[n] + dtime
-		end
 		local balloon = self.object
 		local player = self._balloonist
 		if player and players[player] then
-			local player_name = player:get_player_name()
-			local control = player:get_player_control()
-			local status = p_get(player, "status")
-			local balloon_pos = balloon:get_pos()
-			local hud = p_get(player, "hud")
-			if timers.environment >= 30 then
-				set_random_sky(player)
-				timers.environment = 0
+
+			local timers = p_get(player, "timers")
+			for n, _ in pairs(timers) do
+				timers[n] = timers[n] + dtime
 			end
 
-			if status == "running" then
-				local boosts = p_get(player, "boosts")
-
-				if timers.score >= 0.5 then
-					p_set(player, "score", math.floor(balloon_pos.x + 0.5))
-				end
-
-				local sand_drive = self._sand_drive
-				if timers.seconds >= 1 then
-					local boost_hud = hud.boosts
-					if self._gas_drive then
-						local gas_seconds = boosts.gas
-						local gas_hud = hud.boosts.gas
-						if gas_seconds == 0 then
-							remove_gas_drive(self)
-							player:hud_remove(gas_hud)
-							player:hud_remove(boost_hud.images[1])
-						else
-							boosts.gas = gas_seconds - 1
-							player:hud_change(gas_hud, "text", boosts.gas)
-						end
-					end
-
-					if self._shield_drive then
-						local shield_seconds = boosts.shield
-						local shield_hud = hud.boosts.shield
-						if shield_seconds == 0 then
-							remove_shield_drive(self)
-							player:hud_remove(shield_hud)
-							player:hud_remove(boost_hud.images[6])
-						else
-							boosts.shield = shield_seconds - 1
-							player:hud_change(shield_hud, "text", boosts.shield)
-						end
-					end
-
-					if sand_drive > 0 then
-						for i = 1, 4 do
-							local sandbag = self._sandbags[i]
-							local sand_hud = hud.boosts.sand[i]
-							if sandbag:get_properties().is_visible then
-								local sand_seconds = boosts.sand[i]
-								if sand_seconds == 0 then
-									remove_sand_drive(self, false, sandbag)
-									player:hud_remove(sand_hud)
-									player:hud_remove(boost_hud.images[i + 1])
-								else
-									boosts.sand[i] = sand_seconds - 1
-									player:hud_change(sand_hud, "text", boosts.sand[i])
-								end
-							end
-						end
-					end
-					timers.seconds = 0
-				end
-
-				local vx, vy, vz = 10, -1, 0
-				if control.left then
-					vz = 20
-				elseif control.right then
-					vz = -20
-				else
-					vx = 20
-				end
-
-				if self._gas_drive then
-					for i = 1, 2 do
-						minetest.add_particle({
-							pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.6, math.random(-15, 15) / 100),
-							velocity = vector.offset(balloon:get_velocity(), -0.3, 3, 0),
-							expirationtime = 0.3,
-							size = math.random(1, 10) / 20,
-							texture = color_to_texture(math.random(1, 4)),
-							playername = player_name,
-						})
-					end
-					vx = vx + 30
-				end
-
-				if sand_drive > 0 then
-					for i = 1, sand_drive do
-						minetest.add_particle({
-							pos = vector.offset(balloon:get_pos(), math.random(-20, 20) / 100, balloon_scale / 2 - 2, math.random(-20, 20) / 100),
-							velocity = vector.offset(balloon:get_velocity(), math.random(-5, 5) / 10, -1, math.random(-5, 5) / 10),
-							expirationtime = 1,
-							size = math.random(1, 10) / 15,
-							texture = color_to_texture(table_random({1, 6, 15, 16})),
-							playername = player_name,
-						})
-					end
-					vy = sand_drive * 2
-				end
-
-				if control.down then
-					vy = -10
-				end
-
-				if self._bird_drive then
-					vy = vy - 20
-				end
-
-				balloon:set_velocity(vector.new(vx, vy, vz))
-
-				if control.aux1 then
-					pause_game(player, balloon)
-				end
-
-				if timers.change_spawn_pos > 3 then
-					self._spawn_pos = {y = balloon_pos.y + math.random(-10, 10), z = balloon_pos.z + math.random(-20, 20)}
-					timers.change_spawn_pos = 0
-				end
-
-				if timers.spawn_objects >= 0.7 then
-					local _pos = self._spawn_pos
-					local x = balloon_pos.x + 90
-					if math.random(1, 10) == 1 then
-						for i = -2, 2 do
-							local pos = vector.new(x, _pos.y, _pos.z + i * 8)
-							if minetest.get_node(pos).name == "air" then
-								minetest.add_entity(pos, table_random(spawn_entities)):get_luaentity()._attached_player = player
-							end
-						end
-					else
-						local pos = vector.new(x, _pos.y, _pos.z)
-						if minetest.get_node(pos).name == "air" then
-							minetest.add_entity(pos, table_random(spawn_entities)):get_luaentity()._attached_player = player
-						end
-					end
-					
-					timers.spawn_objects = 0
-				end
-
-				local radius = balloon_scale / 2
-				for _, obj in pairs(minetest.get_objects_inside_radius(vector.offset(balloon_pos, 0, radius, 0), radius + 2.5)) do
-					local ent = obj:get_luaentity()
-					if ent then
-						local ename = ent.name
-						if ename ~= prefix .. "balloon" and ename ~= prefix .. "balloon_gasbottle" and ename ~= prefix .. "balloon_sandbag" then
-							if ename == prefix .. "bird" then
-								play_sound("bird", 3, player)
-								if not self._shield_drive then
-									play_sound("sink", 2, player)
-									self._bird_drive = true
-									minetest.after(1.5, function()
-										if player and self._bird_drive then
-											self._bird_drive = false
-										end
-									end)
-								else
-									remove_shield_drive(self)
-									play_sound("remove_shield", 1, player)
-								end
-							else
-								play_sound("collect", 1, player)
-							end
-
-							if ename == prefix .. "coin" then
-								p_set(player, "coin_points", p_get(player, "coin_points") + 100)
-								local bonus_hud = p_get(player, "hud").bonus_points
-								if not bonus_hud then
-									hud.bonus_points = player:hud_add({
-										hud_elem_type = "text",
-										position = {x = 0.75, y = 0.5},
-										text = "+100",
-										size = {x = 2, y = 2},
-										number = 0x4B726E,
-										z_index = 0,
-										style = 1,
-									})
-									minetest.after(1.2, function()
-										if player then
-											player:hud_remove(hud.bonus_points)
-											hud.bonus_points = nil
-										end
-									end)
-								else
-									local get_bonus_hud = player:hud_get(bonus_hud)
-									local text = get_bonus_hud.text
-									local value = tonumber(string.sub(text, 2, 2)) + 1
-									player:hud_change(bonus_hud, "text", "+" .. value .. "00")
-								end
-							elseif ename == prefix .. "sandbag" or ename == prefix .. "gasbottle" or ename == prefix .. "shield_coin" then
-								player:get_inventory():add_item("main", {name = ename .. "_item"})
-							end
-							obj:move_to(balloon_pos)
-							obj:remove()
-						end
-					end
-				end
-
-				local bonus_hud = hud.bonus_points
-				if bonus_hud and player:hud_get(bonus_hud) then
-					local get_bonus_hud = player:hud_get(bonus_hud)
-					player:hud_change(bonus_hud, "position", {
-						x = get_bonus_hud.position.x + 0.002,
-						y = get_bonus_hud.position.y - 0.005,
-					})
-				end
-
-				if not self._shield_drive and balloon_pos.x >= 60 and not balloon:get_properties().physical and minetest.get_node(balloon_pos).name == "air" then
-					self.object:set_properties({
-						physical = true,
-					})
-				elseif moveresult and not self._shield_drive then
-					for _, collision in pairs(moveresult.collisions) do
-						if minetest.get_node(collision.node_pos).name ~= "" then
-							p_set(player, "status", "counting")
-							break
-						end
-					end
-				end
-
-			elseif status == "counting" then
-				local counting = p_get(player, "counting")
-				if not hud.counter then
-					hud.counter = player:hud_add({
-						hud_elem_type = "text",
-						position = {x = 0.5, y = 0.5},
-						text = counting,
-						number = 0x4B726E,
-						size = {x = 5, y = 5},
-						z_index = 0,
-						style = 1,
-					})
-					balloon:set_velocity(vector.new(0, 0, 0))
-				elseif counting < 0 then
-					pause_game(player, balloon)
-					player:hud_remove(p_get(player, "hud").counter)
-					p_set(player, "counting", 5)
-					hud.counter = nil
-				else
-					if timers.counter >= 0.5 then
-						p_set(player, "counting", counting - 1)
-						player:hud_change(hud.counter, "text", counting)
-						timers.counter = 0
-					end
-				end
-			elseif status == "paused" then
-				if control.jump then
-					p_set(player, "status", "running")
-					player:hud_remove(p_get(player, "hud").paused)
-				end
-			end
-
-			update_score_hud(player)
+			main_loop(self, balloon, player, timers, moveresult)
+			
 		else
 			balloon:remove()
 		end
@@ -892,10 +881,6 @@ minetest.register_entity(prefix .. "balloon", {
 	end,
 })
 
-minetest.register_on_newplayer(function(player)
-	reset_pos(player)
-end)
-
 minetest.register_on_joinplayer(function(player)
 	set_environment(player)
 
@@ -906,37 +891,42 @@ minetest.register_on_joinplayer(function(player)
 		counting = 5,
 		highscore = player:get_meta():get_int("highscore"),
 		balloon = nil,
-		boosts = {
-			gas = 0,
-			shield = 0,
-			sand = {0, 0, 0, 0},
-		}
-	}
-	players[player].hud = {
-		overlay = player:hud_add({
-			hud_elem_type = "image",
-			position = {x = 0.5, y = 0.5},
-			scale = {x = -101, y = -101},
-			text = "balloon_hud_overlay.png",
-			z_index = -1,
-		}),
-		score = player:hud_add({
-			hud_elem_type = "text",
-			position = {x = 1, y = 0},
-			offset = {x = -20, y = 20},
-			text = "",
-			number = 0x4B726E,
-			alignment = {x = -1, y = 1},
-			z_index = 0,
-			style = 1,
-		}),
-		boosts = {
-			gas = nil,
-			shield = nil,
-			sand = {nil, nil, nil, nil},
-			images = {nil, nil, nil, nil, nil, nil},
+		boosts = {0, 0, 0, 0, 0, 0},
+		timers = {
+			environment = 0,
+			balloon = 0,
+			score = 0,
+			counter = 0,
+			spawn_objects = 0,
+			change_spawn_pos = 0,
+			seconds = 0,
+			speed = 0,
+		},
+		hud = {
+			overlay = player:hud_add({
+				hud_elem_type = "image",
+				position = {x = 0.5, y = 0.5},
+				scale = {x = -101, y = -101},
+				text = "balloon_hud_overlay.png",
+				z_index = -1,
+			}),
+			score = player:hud_add({
+				hud_elem_type = "text",
+				position = {x = 1, y = 0},
+				offset = {x = -20, y = 20},
+				text = "",
+				number = 0x4B726E,
+				alignment = {x = -1, y = 1},
+				z_index = 0,
+				style = 1,
+			}),
+			boosts = {
+				counters = {nil, nil, nil, nil, nil, nil},
+				images = {nil, nil, nil, nil, nil, nil},
+			},
 		},
 	}
+
 	local balloon = minetest.add_entity(player:get_pos(), prefix .. "balloon"):get_luaentity()
 	balloon._attach_balloonist(balloon, player)
 

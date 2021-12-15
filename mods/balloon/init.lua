@@ -515,7 +515,7 @@ minetest.register_craftitem(prefix .. "sandbag_item", {
 })
 
 local spawn_entities = {}
-local function register_spawn_entity(name, scale, texture, rotation, spawn, extras, init_extras)
+local function register_spawn_entity(name, scale, texture, probability, rotation, spawn, extras, init_extras)
 	local properties = {
 		initial_properties = {
 			visual = "mesh",
@@ -557,8 +557,10 @@ local function register_spawn_entity(name, scale, texture, rotation, spawn, extr
 	end
 
 	local ent_name = prefix .. name
-	if spawn then
-		table.insert(spawn_entities, ent_name)
+	if spawn and probability then
+		for i = 1, 100 * probability do
+			table.insert(spawn_entities, ent_name)
+		end
 	else
 		properties.initial_properties.is_visible = false
 	end
@@ -566,9 +568,10 @@ local function register_spawn_entity(name, scale, texture, rotation, spawn, extr
 
 end
 
-register_spawn_entity("coin", 15, "balloon_coin.png", true, true)
-register_spawn_entity("shield_coin", 15, "balloon_shield_coin.png", 1, true, nil, {mesh = "balloon_coin.obj"})
-register_spawn_entity("bird", 10, "", false, true, {
+register_spawn_entity("coin", 15, "balloon_coin.png", 0.6, true, true)
+register_spawn_entity("shield_coin", 15, "balloon_shield_coin.png", 0.05, 10, true, nil, {mesh = "balloon_coin.obj"})
+
+register_spawn_entity("bird", 10, "", probability,false, true, {
 	on_activate = function(self)
 		self.object:set_properties({
 			textures = {color_to_texture(random_color())},
@@ -576,12 +579,14 @@ register_spawn_entity("bird", 10, "", false, true, {
 		self.object:set_velocity(vector.new(-10, math.random(-2, 2), math.random(-2, 2)))
 	end
 })
-register_spawn_entity("gasbottle", 10, color_to_texture(3), true, true)
-register_spawn_entity("sandbag", 10, color_to_texture(8), true, true)
+
+register_spawn_entity("gasbottle", 10, color_to_texture(3), 0.1, true, true)
+register_spawn_entity("sandbag", 10, color_to_texture(8), 0.25, true, true)
+
+register_spawn_entity("balloon_gasbottle", 1, color_to_texture(3), nil, 0.1)
+register_spawn_entity("balloon_sandbag", 1, color_to_texture(8), nil, 0.1)
 
 local balloon_scale = 3
-register_spawn_entity("balloon_gasbottle", 1, color_to_texture(3), 0.1)
-register_spawn_entity("balloon_sandbag", 1, color_to_texture(8), 0.1)
 minetest.register_entity(prefix .. "balloon", {
 	initial_properties = {
 		visual = "mesh",

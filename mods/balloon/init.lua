@@ -320,6 +320,13 @@ local function remove_gas_drive(b_ent)
 	})
 end
 
+local function remove_bird_drive(b_ent)
+	b_ent._bird_drive = false
+	b_ent.object:set_properties({
+		automatic_rotate = 0.1,
+	})
+end
+
 local function update_boost_board(player, color, a)
 	player:hud_change(p_get(player, "hud").boost_board, "text", "balloon_hud_boost.png^[colorize:#" .. colors[color] .. ":" .. a)
 end
@@ -360,7 +367,11 @@ end
 local function pause_game(player, balloon)
 	set_highscore(player)
 	p_set(player, "status", "paused")
-	add_paused_screen(player)
+	minetest.after(0.01, function()
+		if p_get(player, "status") == "paused" then
+			add_paused_screen(player)
+		end
+	end)
 	reset_pos(balloon)
 
 	local inv = player:get_inventory()
@@ -374,6 +385,7 @@ local function pause_game(player, balloon)
 	remove_gas_drive(b_ent)
 	remove_sand_drive(b_ent, true)
 	remove_shield_drive(b_ent)
+	remove_bird_drive(b_ent)
 
 	players[player].boosts = {0, 0, 0, 0, 0, 0}
 
@@ -399,6 +411,7 @@ local function pause_game(player, balloon)
 
 	balloon:set_properties({
 		physical = false,
+		rotation = 0.1,
 	})
 end
 
@@ -545,6 +558,7 @@ local function register_spawn_entity(name, scale, texture, probability, rotation
 	else
 		properties.initial_properties.is_visible = false
 	end
+	
 	minetest.register_entity(ent_name, properties)
 end
 
@@ -637,6 +651,10 @@ local function main_loop(self, balloon, player, timers, moveresult)
 			timers.seconds = 0
 		end
 
+		if timers.bird >= 1.5 and self._bird_drive then
+			remove_bird_drive(self)
+		end
+
 		local vx, vy, vz = 10, -1, 0
 		if control.left then
 			vz = 20
@@ -688,10 +706,6 @@ local function main_loop(self, balloon, player, timers, moveresult)
 
 		balloon:set_velocity(vector.new(vx + _speed, vy, vz))
 
-		if control.aux1 then
-			pause_game(player, balloon)
-		end
-
 		if timers.change_spawn_pos > 3 then
 			self._spawn_pos = {
 				y = balloon_pos.y + math.random(-10, 10),
@@ -727,11 +741,10 @@ local function main_loop(self, balloon, player, timers, moveresult)
 						if not self._shield_drive then
 							play_sound("sink", 2, player)
 							self._bird_drive = true
-							minetest.after(1.5, function()
-								if player and self._bird_drive then
-									self._bird_drive = false
-								end
-							end)
+							balloon:set_properties({
+								automatic_rotate = 5,
+							})
+							timers.bird = 0
 						else
 							remove_shield_drive(self)
 							play_sound("remove_shield", 1, player)
@@ -795,6 +808,9 @@ local function main_loop(self, balloon, player, timers, moveresult)
 					break
 				end
 			end
+		end
+		if control.aux1 then
+			pause_game(player, balloon)
 		end
 
 	elseif status == "counting" then
@@ -913,6 +929,7 @@ minetest.register_on_joinplayer(function(player)
 			change_spawn_pos = 0,
 			seconds = 0,
 			speed = 0,
+			bird = 0,
 		},
 		hud = {
 			overlay = player:hud_add({
@@ -925,7 +942,7 @@ minetest.register_on_joinplayer(function(player)
 			boost_board = player:hud_add({
 				hud_elem_type = "image",
 				position = {x = 1, y = 0},
-				scale = {x = 0.5, y = 0.5},
+				scale = {x = 0.46, y = 0.5},
 				offset = {x = -5, y = 5},
 				alignment = {x = -1, y = 1},
 				text = "balloon_hud_boost.png^[colorize:#" .. colors[15] .. ":10",

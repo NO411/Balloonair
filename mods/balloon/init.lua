@@ -264,6 +264,7 @@ local function reset_pos(balloon)
 	for n, p in pairs(minetest.get_connected_players()) do
 		if player == p then
 			n_player = n
+			break
 		end
 	end
 	balloon:move_to(vector.new(0, 100, 50 * n_player - 50))
@@ -272,7 +273,7 @@ end
 
 
 local function add_paused_screen(player)
-	players[player].hud.paused = player:hud_add({
+	p_get(player, "hud").paused = player:hud_add({
 		hud_elem_type = "text",
 		position = {x = 0.5, y = 0.5},
 		text = "Press JUMP to start",
@@ -319,6 +320,10 @@ local function remove_gas_drive(b_ent)
 	})
 end
 
+local function update_boost_board(player, color, a)
+	player:hud_change(p_get(player, "hud").boost_board, "text", "balloon_hud_boost.png^[colorize:#" .. colors[color] .. ":" .. a)
+end
+
 local function remove_shield_drive(b_ent)
 	b_ent._shield_drive = false
 	b_ent.object:set_properties({
@@ -331,6 +336,7 @@ local function remove_shield_drive(b_ent)
 		player:hud_remove(shield_hud)
 		player:hud_remove(boost_hud.images[6])
 	end
+	update_boost_board(player, 15, 10)
 end
 
 local function remove_sand_drive(b_ent, all, sandbag, i)
@@ -399,10 +405,10 @@ end
 local function add_boost_image(player, image, i)
 	p_get(player, "hud").boosts.images[i] = player:hud_add({
 		hud_elem_type = "image",
-		position = {x = 1, y = 0.05 + 0.05 * i},
+		position = {x = 1, y = 0},
 		alignment = {x = -1, y = 1},
 		scale = {x = 1.5, y = 1.5},
-		offset = {x = -40, y = -2},
+		offset = {x = -40, y = 17.5 + 30 * i},
 		text = "balloon_" .. image .. ".png",
 		z_index = 0,
 	})
@@ -412,8 +418,8 @@ local function add_boost_counter(player, i)
 	p_get(player, "boosts")[i] = 10
 	p_get(player, "hud").boosts.counters[i] = player:hud_add({
 		hud_elem_type = "text",
-		position = {x = 1, y = 0.05 + 0.05 * i},
-		offset = {x = -20, y = 0},
+		position = {x = 1, y = 0},
+		offset = {x = -20, y = 20 + 30 * i},
 		alignment = {x = -1, y = 1},
 		text = "10",
 		number = 0x4B726E,
@@ -452,6 +458,7 @@ minetest.register_craftitem(prefix .. "shield_coin_item", {
 			itemstack:take_item()
 			add_boost_counter(user, 6)
 			add_boost_image(user, "shield", 6)
+			update_boost_board(user, 9, 200)
 			balloon:set_properties({
 				physical = false,
 			})
@@ -544,20 +551,26 @@ end
 register_spawn_entity("coin", 15, "balloon_coin.png", 0.5, true, true)
 register_spawn_entity("shield_coin", 15, "balloon_shield_coin.png", 0.05, 10, true, nil, {mesh = "balloon_coin.obj"})
 
-register_spawn_entity("bird", 10, "", 0.25, false, true, {
+register_spawn_entity("bird", 10, "", 0.3, false, true, {
 	on_activate = function(self)
 		self.object:set_properties({
 			textures = {color_to_texture(random_color())},
 		})
-		self.object:set_velocity(vector.new(-10, math.random(-2, 2), math.random(-2, 2)))
+		self.object:set_velocity(vector.new(-40, math.random(-10, 10), math.random(-10, 10)))
 	end
 })
 
-register_spawn_entity("gasbottle", 10, color_to_texture(3), 0.1, true, true)
+register_spawn_entity("gasbottle", 10, color_to_texture(3), 0.05, true, true)
 register_spawn_entity("sandbag", 10, color_to_texture(8), 0.1, true, true)
 
 register_spawn_entity("balloon_gasbottle", 1, color_to_texture(3), nil, 0.1)
 register_spawn_entity("balloon_sandbag", 1, color_to_texture(8), nil, 0.1)
+
+local function spawn_random_entity(pos, player)
+	if minetest.get_node(pos).name == "air" then
+		minetest.add_entity(pos, table_random(spawn_entities)):get_luaentity()._attached_player = player
+	end
+end
 
 local balloon_scale = 3
 
@@ -680,7 +693,10 @@ local function main_loop(self, balloon, player, timers, moveresult)
 		end
 
 		if timers.change_spawn_pos > 3 then
-			self._spawn_pos = {y = balloon_pos.y + math.random(-10, 10), z = balloon_pos.z + math.random(-20, 20)}
+			self._spawn_pos = {
+				y = balloon_pos.y + math.random(-10, 10),
+				z = balloon_pos.z + math.random(-20, 20)
+			}
 			timers.change_spawn_pos = 0
 		end
 
@@ -690,15 +706,11 @@ local function main_loop(self, balloon, player, timers, moveresult)
 			if math.random(1, 10) == 1 then
 				for i = -2, 2 do
 					local pos = vector.new(x, _pos.y, _pos.z + i * 8)
-					if minetest.get_node(pos).name == "air" then
-						minetest.add_entity(pos, table_random(spawn_entities)):get_luaentity()._attached_player = player
-					end
+					spawn_random_entity(pos, player)
 				end
 			else
 				local pos = vector.new(x, _pos.y, _pos.z)
-				if minetest.get_node(pos).name == "air" then
-					minetest.add_entity(pos, table_random(spawn_entities)):get_luaentity()._attached_player = player
-				end
+				spawn_random_entity(pos, player)
 			end
 			
 			timers.spawn_objects = 0
@@ -737,7 +749,7 @@ local function main_loop(self, balloon, player, timers, moveresult)
 								text = "+10",
 								size = {x = 2, y = 2},
 								number = 0x4B726E,
-								z_index = 0,
+								z_index = -2,
 								style = 1,
 							})
 							minetest.after(1.2, function()
@@ -908,6 +920,15 @@ minetest.register_on_joinplayer(function(player)
 				position = {x = 0.5, y = 0.5},
 				scale = {x = -101, y = -101},
 				text = "balloon_hud_overlay.png",
+				z_index = -1,
+			}),
+			boost_board = player:hud_add({
+				hud_elem_type = "image",
+				position = {x = 1, y = 0},
+				scale = {x = 0.5, y = 0.5},
+				offset = {x = -5, y = 5},
+				alignment = {x = -1, y = 1},
+				text = "balloon_hud_boost.png^[colorize:#" .. colors[15] .. ":10",
 				z_index = -1,
 			}),
 			score = player:hud_add({

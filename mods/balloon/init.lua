@@ -556,7 +556,7 @@ register_spawn_entity("bird", 10, "", 0.3, false, true, {
 		self.object:set_properties({
 			textures = {color_to_texture(random_color())},
 		})
-		self.object:set_velocity(vector.new(-40, math.random(-10, 10), math.random(-10, 10)))
+		self.object:set_velocity(vector.new(-40, 0, 0))
 	end
 })
 

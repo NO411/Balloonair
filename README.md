@@ -2,6 +2,7 @@
 ## by NO11
 
 A hot air balloon game for Minetest.
+
 ![screenshot](https://github.com/NO411/Balloonair/blob/main/screenshot.png)
 
 This game was created in 21 days for the 2021 Minetest GAME JAM.
@@ -9,7 +10,7 @@ Everything (sounds, textures, models, code) was created by NO11 in these 21 days
 
 The goal of the game is to get the highest score. The score is made up of the position of your balloon and the coins you have collected.
 Try not to sink down!
-You can play this game on a server with other players. You can see the scores of all online players by running `/ scores`. 
+You can play this game on a server with other players. You can see the scores of all online players by running `/scores`. 
 
 ##### Gameplay
 

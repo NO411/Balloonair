@@ -412,6 +412,7 @@ local function pause_game(player, balloon)
 		physical = false,
 		rotation = 0.1,
 	})
+	balloon:set_rotation(vector.new(0, 0, 0))
 end
 
 local function add_boost_hud(player, i, image)
@@ -593,11 +594,14 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 	local status = p_get(player, "status")
 	local balloon_pos = balloon:get_pos()
 	local hud = p_get(player, "hud")
+	local rotation = balloon:get_rotation()
+
 
 	if timers.environment >= 30 then
 		set_random_sky(player)
 		timers.environment = 0
 	end
+	
 	if status == "running" then
 		local boosts = p_get(player, "boosts")
 
@@ -654,14 +658,34 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			remove_bird_drive(self)
 		end
 
+		local rx, rz = 0, 0
 		local vx, vy, vz = 10, -1, 0
+		local rotx = rotation.x
 		if control.left then
 			vz = 20
+			if rotx > -0.2 then
+				rx = rotx - 0.004
+			else
+				rx = -0.21
+			end
 		elseif control.right then
 			vz = -20
+			if rotx < 0.2 then
+				rx = rotx + 0.004
+			else
+				rx = 0.21
+			end
 		else
 			vx = 20
+			if rotx > 0.01 then
+				rx = rotx - 0.004
+			elseif rotx < -0.01 then
+				rx = rotx + 0.004
+			else
+				rx = 0
+			end
 		end
+
 		if self._gas_drive then
 			for i = 1, 2 do
 				minetest.add_particle({
@@ -674,6 +698,17 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 				})
 			end
 			vx = vx + 30
+			if rotation.z < 0.2 then
+				rz = rotation.z + 0.005
+			else
+				rz = 0.21
+			end
+		else
+			if rotation.z > 0.01 then
+				rz = rotation.z - 0.005
+			else
+				rz = 0
+			end
 		end
 
 		if sand_drive > 0 then
@@ -702,6 +737,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 		self._speed = _speed + 0.01
 
 		balloon:set_velocity(vector.new(vx + _speed, vy, vz))
+		balloon:set_rotation(vector.new(rx, 0, rz))
 
 		if timers.change_spawn_pos > 3 then
 			self._spawn_pos = {

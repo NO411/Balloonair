@@ -286,7 +286,7 @@ end
 local function set_highscore(player)
 	local score = p_get(player, "score") + p_get(player, "coin_points")
 	if score > p_get(player, "highscore") then
-	       p_set(player, "highscore", score)
+		p_set(player, "highscore", score)
 	end
 	p_set(player, "score", 0)
 	p_set(player, "coin_points", 0)
@@ -364,13 +364,14 @@ local function remove_sand_drive(b_ent, all, sandbag, i)
 end
 
 local function pause_game(player, balloon)
-	set_highscore(player)
 	p_set(player, "status", "paused")
+
 	minetest.after(0.01, function()
 		if p_get(player, "status") == "paused" then
 			add_paused_screen(player)
 		end
 	end)
+	set_highscore(player)
 	reset_pos(balloon)
 
 	local inv = player:get_inventory()
@@ -838,6 +839,9 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			for _, collision in pairs(moveresult.collisions) do
 				if minetest.get_node(collision.node_pos).name ~= "" then
 					p_set(player, "status", "counting")
+					balloon:set_properties({
+						rotation = 0,
+					})
 					break
 				end
 			end
@@ -877,6 +881,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			player:hud_remove(p_get(player, "hud").paused)
 		end
 	end
+	
 	update_score_hud(player)
 end
 
@@ -1026,6 +1031,6 @@ minetest.register_chatcommand("scores", {
 		for player, _ in pairs(players) do
 			str = str .. player:get_player_name() .. ": " .. p_get(player, "highscore") .. "\n"
 		end
-		minetest.chat_send_player(name, minetest.colorize("#" .. colors[13], str))
+		minetest.chat_send_player(name, minetest.colorize("#" .. colors[13], string.sub(str, 1, -2)))
 	end
 })

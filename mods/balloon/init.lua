@@ -236,7 +236,7 @@ local function set_environment(player)
 	})
 	player:set_eye_offset(vector.new(0, 30, -60))
 	player:set_look_horizontal(4.7)
-	player:set_look_vertical(0)
+	player:set_look_vertical(0.28)
 	set_random_sky(player)
 	player:set_properties({
 		textures = {"blank.png"},
@@ -598,7 +598,6 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 		set_random_sky(player)
 		timers.environment = 0
 	end
-
 	if status == "running" then
 		local boosts = p_get(player, "boosts")
 

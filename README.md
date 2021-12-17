@@ -30,6 +30,8 @@ While trying not to sink, enjoy the beautiful randomly generated landscape!
 
 ##### Controls
 
+Where you move the mouse doesn't affect where you fly, you always fly in the direction of the sun and can only steer right, left, up and down!
+
 * Down: lower the balloon
 * Left: move the balloon to the left
 * Right: move the balloon to the rigth

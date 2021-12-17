@@ -2,6 +2,7 @@
 ## by NO11
 
 A hot air balloon game for Minetest.
+
 ![screenshot](https://github.com/NO411/Balloonair/blob/main/screenshot.png)
 
 This game was created in 21 days for the 2021 Minetest GAME JAM.

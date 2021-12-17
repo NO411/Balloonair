@@ -411,7 +411,6 @@ local function pause_game(player, balloon)
 
 	balloon:set_properties({
 		physical = false,
-		rotation = 0.1,
 	})
 	balloon:set_rotation(vector.new(0, 0, 0))
 end
@@ -520,7 +519,6 @@ local function register_spawn_entity(name, scale, texture, probability, rotation
 			pointable = false,
 			textures = {texture},
 			visual_size = vector.new(scale, scale, scale),
-			collisionbox = {-10, -10, -10, 10, 10, 10},
 		},
 		_attached_player = nil,
 		on_step = function(self)
@@ -840,7 +838,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 				if minetest.get_node(collision.node_pos).name ~= "" then
 					p_set(player, "status", "counting")
 					balloon:set_properties({
-						rotation = 0,
+						automatic_rotate = 0,
 					})
 					break
 				end

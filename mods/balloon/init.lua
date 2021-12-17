@@ -1,6 +1,5 @@
 local minetest, math, vector, pairs, table = minetest, math, vector, pairs, table
 local modname = minetest.get_current_modname()
-local modpath = minetest.get_modpath(modname)
 
 minetest.settings:set("time_speed", 0)
 
@@ -327,8 +326,8 @@ local function remove_bird_drive(b_ent)
 	})
 end
 
-local function update_boost_board(player, color, a)
-	player:hud_change(p_get(player, "hud").boost_board, "text", "balloon_hud_boost.png^[colorize:#" .. colors[color] .. ":" .. a)
+local function update_boost_board(player, effect)
+	player:hud_change(p_get(player, "hud").boost_board, "text", "balloon_hud_boost_board" .. effect .. ".png")
 end
 
 local function remove_shield_drive(b_ent)
@@ -343,7 +342,7 @@ local function remove_shield_drive(b_ent)
 		player:hud_remove(shield_hud)
 		player:hud_remove(boost_hud.images[6])
 	end
-	update_boost_board(player, 15, 10)
+	update_boost_board(player, "")
 end
 
 local function remove_sand_drive(b_ent, all, sandbag, i)
@@ -415,21 +414,10 @@ local function pause_game(player, balloon)
 	})
 end
 
-local function add_boost_image(player, image, i)
-	p_get(player, "hud").boosts.images[i] = player:hud_add({
-		hud_elem_type = "image",
-		position = {x = 1, y = 0},
-		alignment = {x = -1, y = 1},
-		scale = {x = 1.5, y = 1.5},
-		offset = {x = -40, y = 17.5 + 30 * i},
-		text = "balloon_" .. image .. ".png",
-		z_index = 0,
-	})
-end
-
-local function add_boost_counter(player, i)
+local function add_boost_hud(player, i, image)
 	p_get(player, "boosts")[i] = 10
-	p_get(player, "hud").boosts.counters[i] = player:hud_add({
+	local boost_hud = p_get(player, "hud").boosts
+	boost_hud.counters[i] = player:hud_add({
 		hud_elem_type = "text",
 		position = {x = 1, y = 0},
 		offset = {x = -20, y = 20 + 30 * i},
@@ -438,6 +426,15 @@ local function add_boost_counter(player, i)
 		number = 0x4B726E,
 		z_index = 0,
 		style = 1,
+	})
+	boost_hud.images[i] = player:hud_add({
+		hud_elem_type = "image",
+		position = {x = 1, y = 0},
+		alignment = {x = -1, y = 1},
+		scale = {x = 1.5, y = 1.5},
+		offset = {x = -40, y = 17.5 + 30 * i},
+		text = "balloon_" .. image .. ".png",
+		z_index = 0,
 	})
 end
 
@@ -453,8 +450,7 @@ minetest.register_craftitem(prefix .. "gasbottle_item", {
 			gasbottle:set_properties({
 				is_visible = true
 			})
-			add_boost_counter(user, 1)
-			add_boost_image(user, "gasbottle", 1)
+			add_boost_hud(user, 1, "gasbottle")
 			play_sound("gas", 2, user)
 		end
 		return itemstack
@@ -469,9 +465,8 @@ minetest.register_craftitem(prefix .. "shield_coin_item", {
 		if not b_ent._shield_drive and p_get(user, "status") == "running" then
 			b_ent._shield_drive = true
 			itemstack:take_item()
-			add_boost_counter(user, 6)
-			add_boost_image(user, "shield", 6)
-			update_boost_board(user, 9, 200)
+			add_boost_hud(user, 6, "shield")
+			update_boost_board(user, "_shield")
 			balloon:set_properties({
 				physical = false,
 			})
@@ -495,8 +490,7 @@ minetest.register_craftitem(prefix .. "sandbag_item", {
 						is_visible = true,
 					})
 					b_ent._sand_drives[i] = true
-					add_boost_counter(user, i + 1)
-					add_boost_image(user, "sandbag", i + 1)
+					add_boost_hud(user, i + 1, "sandbag")
 					break
 				end
 			end
@@ -594,6 +588,7 @@ local function main_loop(self, balloon, player, timers, moveresult)
 	local status = p_get(player, "status")
 	local balloon_pos = balloon:get_pos()
 	local hud = p_get(player, "hud")
+	
 	if timers.environment >= 30 then
 		set_random_sky(player)
 		timers.environment = 0
@@ -945,7 +940,7 @@ minetest.register_on_joinplayer(function(player)
 				scale = {x = 0.46, y = 0.5},
 				offset = {x = -5, y = 5},
 				alignment = {x = -1, y = 1},
-				text = "balloon_hud_boost.png^[colorize:#" .. colors[15] .. ":10",
+				text = "balloon_hud_boost_board.png",
 				z_index = -1,
 			}),
 			score = player:hud_add({
@@ -959,8 +954,8 @@ minetest.register_on_joinplayer(function(player)
 				style = 1,
 			}),
 			boosts = {
-				counters = {nil, nil, nil, nil, nil, nil},
-				images = {nil, nil, nil, nil, nil, nil},
+				counters = {},
+				images = {},
 			},
 		},
 	}

@@ -438,12 +438,18 @@ local function add_boost_hud(player, i, image)
 	})
 end
 
+local function can_activate_boost(balloon, b_ent, drive, player)
+	return balloon and b_ent and
+	p_get(player, "status") == "running" and
+	((type(b_ent["_" .. drive .. "_drive"]) == "number" and b_ent["_" .. drive .. "_drive"] < 4) or not b_ent["_" .. drive .. "_drive"])
+end
+
 minetest.register_craftitem(prefix .. "gasbottle_item", {
 	inventory_image = "balloon_gasbottle.png",
 	on_use = function(itemstack, user, pointed_thing)
 		local balloon = p_get(user, "balloon")
 		local b_ent = balloon:get_luaentity()
-		if not b_ent._gas_drive and p_get(user, "status") == "running" then
+		if can_activate_boost(balloon, b_ent, "gas", user) then
 			b_ent._gas_drive = true
 			itemstack:take_item()
 			local gasbottle = b_ent._gasbottle
@@ -462,7 +468,7 @@ minetest.register_craftitem(prefix .. "shield_coin_item", {
 	on_use = function(itemstack, user, pointed_thing)
 		local balloon = p_get(user, "balloon")
 		local b_ent = balloon:get_luaentity()
-		if not b_ent._shield_drive and p_get(user, "status") == "running" then
+		if can_activate_boost(balloon, b_ent, "shield", user) then
 			b_ent._shield_drive = true
 			itemstack:take_item()
 			add_boost_hud(user, 6, "shield")
@@ -481,9 +487,8 @@ minetest.register_craftitem(prefix .. "sandbag_item", {
 	on_use = function(itemstack, user, pointed_thing)
 		local balloon = p_get(user, "balloon")
 		local b_ent = balloon:get_luaentity()
-		local sand_drive = b_ent._sand_drive
-		if sand_drive < 4 and p_get(user, "status") == "running" then
-			b_ent._sand_drive = sand_drive + 1
+		if can_activate_boost(balloon, b_ent, "sand", user) then
+			b_ent._sand_drive = b_ent._sand_drive + 1
 			for i, drive in pairs(b_ent._sand_drives) do
 				if not drive then
 					b_ent._sandbags[i]:set_properties({
@@ -582,13 +587,13 @@ end
 
 local balloon_scale = 3
 
-local function main_loop(self, balloon, player, timers, moveresult)
+local function main_loop(self, balloon, player, timers, moveresult, dtime)
 	local player_name = player:get_player_name()
 	local control = player:get_player_control()
 	local status = p_get(player, "status")
 	local balloon_pos = balloon:get_pos()
 	local hud = p_get(player, "hud")
-	
+
 	if timers.environment >= 30 then
 		set_random_sky(player)
 		timers.environment = 0
@@ -695,9 +700,7 @@ local function main_loop(self, balloon, player, timers, moveresult)
 		end
 
 		local _speed = self._speed
-		if timers.speed >= 1 * _speed then
-			self._speed = _speed + 0.01
-		end
+		self._speed = _speed + 0.01
 
 		balloon:set_velocity(vector.new(vx + _speed, vy, vz))
 
@@ -879,7 +882,7 @@ minetest.register_entity(prefix .. "balloon", {
 				timers[n] = timers[n] + dtime
 			end
 
-			main_loop(self, balloon, player, timers, moveresult)
+			main_loop(self, balloon, player, timers, moveresult, dtime)
 			
 		else
 			balloon:remove()
@@ -923,7 +926,6 @@ minetest.register_on_joinplayer(function(player)
 			spawn_objects = 0,
 			change_spawn_pos = 0,
 			seconds = 0,
-			speed = 0,
 			bird = 0,
 		},
 		hud = {

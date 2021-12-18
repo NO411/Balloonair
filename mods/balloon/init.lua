@@ -436,7 +436,7 @@ local function pause_game(player, balloon, won)
 				})
 			}
 			p_get(player, "timers").new_highscore = 0
-			add_explosion(10, player, balloon)
+			add_explosion(amount, player, balloon)
 		else
 			player:hud_change(p_get(player, "hud").new_highscore[1], "text", highscore)
 		end
@@ -908,7 +908,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			end
 		end
 
-		if balloon_pos.x > 30900 then
+		if balloon_pos.x > 200 then
 			pause_game(player, balloon, true)
 		end
 

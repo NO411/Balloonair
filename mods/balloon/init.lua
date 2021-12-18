@@ -378,9 +378,28 @@ local function remove_sand_drive(b_ent, all, sandbag, i)
 	end
 end
 
-local function pause_game(player, balloon)
-	p_set(player, "status", "paused")
+local function add_explosion(amount, player, balloon)
+	for i = 1, #colors do
+		minetest.add_particlespawner({
+			amount = amount,
+			time = 1,
+			minvel = vector.new(-5, 0, -5),
+			maxvel = vector.new(5, 5, 5),
+			attached = balloon,
+			minexptime = 1,
+			maxexptime = 1,
+			minsize = 1,
+			maxsize = 5,
+			texture = color_to_texture(i),
+			playername = player_name,
+		})
+	end
+	play_sound("explosion", 1, player)
+end
 
+local function pause_game(player, balloon, won)
+	p_set(player, "status", "paused")
+	local balloon_pos = balloon:get_pos()
 	minetest.after(0.01, function()
 		if p_get(player, "status") == "paused" then
 			add_paused_screen(player)
@@ -389,6 +408,11 @@ local function pause_game(player, balloon)
 	if set_highscore(player) then
 		if not p_get(player, "hud").new_highscore then
 			local highscore = p_get(player, "highscore")
+			local text = "New Highscore!"
+
+			if won then
+				text = "YOU WON!"
+			end
 
 			p_get(player, "hud").new_highscore = {
 				player:hud_add({
@@ -403,7 +427,7 @@ local function pause_game(player, balloon)
 				player:hud_add({
 					hud_elem_type = "text",
 					position = {x = 0.5, y = 0.2},
-					text = "New Highscore!",
+					text = text,
 					number = 0xC77B58,
 					size = {x = 2, y = 2},
 					z_index = 0,
@@ -411,6 +435,7 @@ local function pause_game(player, balloon)
 				})
 			}
 			p_get(player, "timers").new_highscore = 0
+			add_explosion(10, player, balloon)
 		else
 			player:hud_change(p_get(player, "hud").new_highscore[1], "text", highscore)
 		end
@@ -881,6 +906,12 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 				end
 			end
 		end
+
+		if balloon_pos.x > 30900 then
+			pause_game(player, balloon, true)
+			add_explosion(100, player, balloon)
+		end
+
 		if control.aux1 then
 			pause_game(player, balloon)
 		end

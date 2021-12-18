@@ -404,13 +404,15 @@ local function pause_game(player, balloon, won)
 			add_paused_screen(player)
 		end
 	end)
-	if set_highscore(player) then
+	if set_highscore(player) or won then
 		if not p_get(player, "hud").new_highscore then
 			local highscore = p_get(player, "highscore")
 			local text = "New Highscore!"
+			local amount = 10
 
 			if won then
 				text = "YOU WON!"
+				amount = 100
 			end
 
 			p_get(player, "hud").new_highscore = {
@@ -908,7 +910,6 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 
 		if balloon_pos.x > 30900 then
 			pause_game(player, balloon, true)
-			add_explosion(100, player, balloon)
 		end
 
 		if control.aux1 then

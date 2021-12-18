@@ -42,3 +42,5 @@ Where you move the mouse doesn't affect where you fly, you always fly in the dir
 
 At the moment there are no global variables/functions, it is standalone.
 If it gets enough positive feedback, maybe I'll create a modding API.
+
+The game supports the current stable Minetest version 5.4.1, but with the 5.5-dev you have an even better gaming experience!

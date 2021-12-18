@@ -908,7 +908,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			end
 		end
 
-		if balloon_pos.x > 200 then
+		if balloon_pos.x > 30900 then
 			pause_game(player, balloon, true)
 		end
 

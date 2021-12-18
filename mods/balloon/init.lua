@@ -215,6 +215,20 @@ local function p_set(p, v, n)
 	players[p][v] = n
 end
 
+local function remove_hud(player, ...)
+	local hud = p_get(player, "hud")
+	local id = hud
+	local ids = {...}
+	for i, _id in pairs(ids) do
+		if i == #ids then
+			player:hud_remove(id[_id])
+			id[_id] = nil
+			break
+		end
+		id = id[_id]
+	end
+end
+
 local function set_environment(player)
 	player:hud_set_flags({
 		healthbar = false,
@@ -284,13 +298,16 @@ local function add_paused_screen(player)
 end
 
 local function set_highscore(player)
+	local ret = false
 	local score = p_get(player, "score") + p_get(player, "coin_points")
 	if score > p_get(player, "highscore") then
 		p_set(player, "highscore", score)
+		ret = true
 	end
 	p_set(player, "score", 0)
 	p_set(player, "coin_points", 0)
 	player:get_meta():set_int("highscore", p_get(player, "highscore"))
+	return ret
 end
 
 local function get_score(player, highscore)
@@ -336,11 +353,9 @@ local function remove_shield_drive(b_ent)
 		physical = true,
 	})
 	local player = b_ent._balloonist
-	local boost_hud = p_get(player, "hud").boosts
-	local shield_hud = boost_hud.counters[6]
-	if shield_hud and player:hud_get(shield_hud) then
-		player:hud_remove(shield_hud)
-		player:hud_remove(boost_hud.images[6])
+	if p_get(player, "hud").boosts.counters[6] then
+		remove_hud(player, "boosts", "counters", 6)
+		remove_hud(player, "boosts", "images", 6)
 	end
 	update_boost_board(player, "")
 end
@@ -371,7 +386,22 @@ local function pause_game(player, balloon)
 			add_paused_screen(player)
 		end
 	end)
-	set_highscore(player)
+	if set_highscore(player) then
+		if not p_get(player, "hud").new_highscore then
+			p_get(player, "hud").new_highscore = player:hud_add({
+				hud_elem_type = "text",
+				position = {x = 0.5, y = 0.2},
+				text = p_get(player, "highscore") .. "\nNew Highscore!",
+				number = 0xAE5D40,
+				size = {x = 2, y = 2},
+				z_index = 0,
+				style = 1,
+			})
+			p_get(player, "timers").new_highscore = 0
+		else
+			player:hud_change(p_get(player, "hud").new_highscore, "text", p_get(player, "highscore") .. "\nNew Highscore!")
+		end
+	end
 	reset_pos(balloon)
 
 	local inv = player:get_inventory()
@@ -390,22 +420,20 @@ local function pause_game(player, balloon)
 	players[player].boosts = {0, 0, 0, 0, 0, 0}
 
 	local boost_hud = p_get(player, "hud").boosts
-	local gas_hud = boost_hud.counters[1]
-	if gas_hud and player:hud_get(gas_hud) then
-		player:hud_remove(gas_hud)
+
+	if boost_hud.counters[1] then
+		remove_hud(player, "boosts", "counters", 1)
 	end
 	
 	for i = 1, 6 do
-		local boost_image_hud = boost_hud.images[i]
-		if boost_image_hud and player:hud_get(boost_image_hud) then
-			player:hud_remove(boost_hud.images[i])
+		if boost_hud.images[i] then
+			remove_hud(player, "boosts", "images", i)
 		end
 	end
 
 	for i = 2, 5 do
-		local sand_hud = boost_hud.counters[i] 
-		if sand_hud and player:hud_get(sand_hud) then
-			player:hud_remove(sand_hud)
+		if boost_hud.counters[i]  then
+			remove_hud(player, "boosts", "counters", i)
 		end
 	end
 
@@ -613,24 +641,22 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			local boost_hud = hud.boosts
 			if self._gas_drive then
 				local gas_seconds = boosts[1]
-				local gas_hud = boost_hud.counters[1]
 				if gas_seconds == 0 then
 					remove_gas_drive(self)
-					player:hud_remove(gas_hud)
-					player:hud_remove(boost_hud.images[1])
+					remove_hud(player, "boosts", "counters", 1)
+					remove_hud(player, "boosts", "images", 1)
 				else
-					player:hud_change(gas_hud, "text", gas_seconds)
+					player:hud_change(boost_hud.counters[1], "text", gas_seconds)
 					boosts[1] = gas_seconds - 1
 				end
 			end
 
 			if self._shield_drive then
 				local shield_seconds = boosts[6]
-				local shield_hud = boost_hud.counters[6]
 				if shield_seconds == 0 then
 					remove_shield_drive(self)
 				else
-					player:hud_change(shield_hud, "text", shield_seconds)
+					player:hud_change(boost_hud.counters[6], "text", shield_seconds)
 					boosts[6] = shield_seconds - 1
 				end
 			end
@@ -638,14 +664,13 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			for i = 2, 5 do
 				local sandbag = self._sandbags[i - 1]
 				if self._sand_drives[i - 1] then
-					local sand_hud = boost_hud.counters[i]
 					local sand_seconds = boosts[i]
 					if sand_seconds == 0 then
-						player:hud_remove(sand_hud)
-						player:hud_remove(boost_hud.images[i])
+						remove_hud(player, "boosts", "counters", i)
+						remove_hud(player, "boosts", "images", i)
 						remove_sand_drive(self, false, sandbag, i - 1)
 					else
-						player:hud_change(sand_hud, "text", sand_seconds)
+						player:hud_change(boost_hud.counters[i], "text", sand_seconds)
 						boosts[i] = sand_seconds - 1
 					end
 				end
@@ -799,8 +824,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 							})
 							minetest.after(1.2, function()
 								if player then
-									player:hud_remove(hud.bonus_points)
-									hud.bonus_points = nil
+									remove_hud(player, "bonus_points")
 								end
 							end)
 						else
@@ -863,9 +887,8 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			balloon:set_velocity(vector.new(0, 0, 0))
 		elseif counting < 0 then
 			pause_game(player, balloon)
-			player:hud_remove(p_get(player, "hud").counter)
+			remove_hud(player, "counter")
 			p_set(player, "counting", 5)
-			hud.counter = nil
 		else
 			if timers.counter >= 0.5 then
 				p_set(player, "counting", counting - 1)
@@ -876,10 +899,20 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 	elseif status == "paused" then
 		if control.jump then
 			p_set(player, "status", "running")
-			player:hud_remove(p_get(player, "hud").paused)
+			remove_hud(player, "paused")
 		end
 	end
 	
+	if hud.new_highscore and timers.new_highscore >= 1 then
+		player:hud_change(hud.new_highscore, "position", {
+			x = 0.5,
+			y = player:hud_get(hud.new_highscore).position.y - 0.01
+		})
+		if timers.new_highscore >= 2 then
+			remove_hud(player, "new_highscore")
+		end
+	end
+
 	update_score_hud(player)
 end
 
@@ -965,6 +998,7 @@ minetest.register_on_joinplayer(function(player)
 			change_spawn_pos = 0,
 			seconds = 0,
 			bird = 0,
+			new_highscore = 0,
 		},
 		hud = {
 			overlay = player:hud_add({

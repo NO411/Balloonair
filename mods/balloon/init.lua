@@ -388,18 +388,31 @@ local function pause_game(player, balloon)
 	end)
 	if set_highscore(player) then
 		if not p_get(player, "hud").new_highscore then
-			p_get(player, "hud").new_highscore = player:hud_add({
-				hud_elem_type = "text",
-				position = {x = 0.5, y = 0.2},
-				text = p_get(player, "highscore") .. "\nNew Highscore!",
-				number = 0xAE5D40,
-				size = {x = 2, y = 2},
-				z_index = 0,
-				style = 1,
-			})
+			local highscore = p_get(player, "highscore")
+
+			p_get(player, "hud").new_highscore = {
+				player:hud_add({
+					hud_elem_type = "text",
+					position = {x = 0.5, y = 0.1},
+					text = highscore,
+					number = 0xAE5D40,
+					size = {x = 2, y = 2},
+					z_index = 0,
+					style = 1,
+				}),
+				player:hud_add({
+					hud_elem_type = "text",
+					position = {x = 0.5, y = 0.2},
+					text = "New Highscore!",
+					number = 0xC77B58,
+					size = {x = 2, y = 2},
+					z_index = 0,
+					style = 1,
+				})
+			}
 			p_get(player, "timers").new_highscore = 0
 		else
-			player:hud_change(p_get(player, "hud").new_highscore, "text", p_get(player, "highscore") .. "\nNew Highscore!")
+			player:hud_change(p_get(player, "hud").new_highscore[1], "text", highscore)
 		end
 	end
 	reset_pos(balloon)
@@ -904,12 +917,16 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 	end
 	
 	if hud.new_highscore and timers.new_highscore >= 1 then
-		player:hud_change(hud.new_highscore, "position", {
-			x = 0.5,
-			y = player:hud_get(hud.new_highscore).position.y - 0.01
-		})
+		for i = 1, 2 do
+			player:hud_change(hud.new_highscore[i], "position", {
+				x = 0.5,
+				y = player:hud_get(hud.new_highscore[i]).position.y - 0.01
+			})
+		end
 		if timers.new_highscore >= 2 then
-			remove_hud(player, "new_highscore")
+			remove_hud(player, "new_highscore", 1)
+			remove_hud(player, "new_highscore", 2)
+			hud.new_highscore = nil
 		end
 	end
 

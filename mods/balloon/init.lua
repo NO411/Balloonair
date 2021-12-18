@@ -906,6 +906,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			if timers.counter >= 0.5 then
 				p_set(player, "counting", counting - 1)
 				player:hud_change(hud.counter, "text", counting)
+				play_sound("tick", 1, player)
 				timers.counter = 0
 			end
 		end

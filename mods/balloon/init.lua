@@ -399,7 +399,6 @@ end
 
 local function pause_game(player, balloon, won)
 	p_set(player, "status", "paused")
-	local balloon_pos = balloon:get_pos()
 	minetest.after(0.01, function()
 		if p_get(player, "status") == "paused" then
 			add_paused_screen(player)

@@ -25,6 +25,7 @@ There are 3 items that you can collect:
 Left click with the item to activate the boost. After 10 seconds the effect is removed.
 Do not try to hit birds, you will kill them and you will sink! If you hit the ground you lose. Be careful: you only come up with sand and otherwise the balloon will keep sinking.
 Collect coins to get more points!
+Do not worry if everything you see is black in the beginning! Then you spawned in a mountain, but as long as you are in it, you are immortal!
 
 While trying not to sink, enjoy the beautiful randomly generated landscape!
 

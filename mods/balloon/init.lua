@@ -42,8 +42,8 @@ local function table_random(t)
 	return t[math.random(#t)]
 end
 
-local function play_sound(sound, max, player)
-	minetest.sound_play({name = "balloon_" .. sound .. math.random(1, max), gain = 1.0, pitch = 1.0}, {to_player = player:get_player_name()}, true)
+local function play_sound(sound, player)
+	minetest.sound_play({name = "balloon_" .. sound, gain = 1.0, pitch = 1.0}, {to_player = player:get_player_name()}, true)
 end
 
 minetest.register_node(prefix .. 13, {
@@ -394,7 +394,7 @@ local function add_explosion(amount, player, balloon)
 			playername = player_name,
 		})
 	end
-	play_sound("explosion", 1, player)
+	play_sound("explosion", player)
 end
 
 local function pause_game(player, balloon, won)
@@ -405,8 +405,8 @@ local function pause_game(player, balloon, won)
 		end
 	end)
 	if set_highscore(player) or won then
+		local highscore = p_get(player, "highscore")
 		if not p_get(player, "hud").new_highscore then
-			local highscore = p_get(player, "highscore")
 			local text = "New Highscore!"
 			local amount = 10
 
@@ -525,7 +525,7 @@ minetest.register_craftitem(prefix .. "gasbottle_item", {
 				is_visible = true
 			})
 			add_boost_hud(user, 1, "gasbottle")
-			play_sound("gas", 2, user)
+			play_sound("gas", user)
 		end
 		return itemstack
 	end,
@@ -544,7 +544,7 @@ minetest.register_craftitem(prefix .. "shield_coin_item", {
 			balloon:set_properties({
 				physical = false,
 			})
-			play_sound("use_shield", 1, user)
+			play_sound("use_shield", user)
 		end
 		return itemstack
 	end,
@@ -569,7 +569,7 @@ minetest.register_craftitem(prefix .. "sandbag_item", {
 			end
 
 			itemstack:take_item()
-			play_sound("sand", 2, user)
+			play_sound("sand", user)
 		end
 		return itemstack
 	end,
@@ -833,9 +833,9 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 				local ename = ent.name
 				if ename ~= prefix .. "balloon" and ename ~= prefix .. "balloon_gasbottle" and ename ~= prefix .. "balloon_sandbag" then
 					if ename == prefix .. "bird" then
-						play_sound("bird", 3, player)
+						play_sound("bird", player)
 						if not self._shield_drive then
-							play_sound("sink", 2, player)
+							play_sound("sink", player)
 							self._bird_drive = true
 							balloon:set_properties({
 								automatic_rotate = 5,
@@ -843,10 +843,10 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 							timers.bird = 0
 						else
 							remove_shield_drive(self)
-							play_sound("remove_shield", 1, player)
+							play_sound("remove_shield", player)
 						end
 					else
-						play_sound("collect", 1, player)
+						play_sound("collect", player)
 					end
 					if ename == prefix .. "coin" then
 						p_set(player, "coin_points", p_get(player, "coin_points") + 10)
@@ -937,7 +937,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			if timers.counter >= 0.5 then
 				p_set(player, "counting", counting - 1)
 				player:hud_change(hud.counter, "text", counting)
-				play_sound("tick", 1, player)
+				play_sound("tick", player)
 				timers.counter = 0
 			end
 		end
@@ -948,14 +948,14 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 		end
 	end
 	
-	if hud.new_highscore and timers.new_highscore >= 1 then
+	if hud.new_highscore and timers.new_highscore >= 2 then
 		for i = 1, 2 do
 			player:hud_change(hud.new_highscore[i], "position", {
 				x = 0.5,
 				y = player:hud_get(hud.new_highscore[i]).position.y - 0.01
 			})
 		end
-		if timers.new_highscore >= 2 then
+		if timers.new_highscore >= 2.5 then
 			remove_hud(player, "new_highscore", 1)
 			remove_hud(player, "new_highscore", 2)
 			hud.new_highscore = nil

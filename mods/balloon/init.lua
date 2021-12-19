@@ -261,7 +261,7 @@ local function set_environment(player)
 		"formspec_version[4]"..
 		"size[10, 10]" ..
 		"bgcolor[#00000000;both;#00000000]"..
-		"background9[0,0;10,10;balloon_hud_boost_board.png^[colorize:#" .. colors[13] ..":200;true;10]"..
+		"background[0,0;10,10;balloon_hud_boost_board.png^[colorize:#" .. colors[13] ..":200;true;10]"..
 		"label[0.5,0.5;Controls:\n\n" ..
 		"- Down: lower the balloon\n" ..
 		"- Left: move the balloon to the left\n" ..

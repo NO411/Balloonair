@@ -239,15 +239,11 @@ local function set_environment(player)
 		minimap_radar = false,
 	})
 	player:hud_set_hotbar_image("blank.png")
-	player:hud_set_hotbar_selected_image("balloon_hotbar_selected.png")
+	player:hud_set_hotbar_selected_image("balloon_hotbar_selected_gasbottle.png")
 	player:hud_set_hotbar_itemcount(3)
 	player:get_inventory():set_size("main", 3)
-	player:set_sun({
-		sunrise_visible = false,
-	})
-	player:set_stars({
-		count = 500,
-	})
+	player:set_sun({sunrise_visible = false})
+	player:set_stars({count = 500})
 	player:set_eye_offset(vector.new(0, 30, -60))
 	player:set_look_horizontal(4.7)
 	player:set_look_vertical(0.28)
@@ -397,6 +393,13 @@ local hotbar_items = {
 	shield_coin = 2,
 	sandbag = 3,
 }
+
+local function update_hotbar(player)
+	local img = "balloon_hotbar_selected_" .. string.sub(player:get_wielded_item():get_name(), string.len(prefix) + 1, -6) .. ".png"
+	if player:hud_get_hotbar_selected_image() ~= img then
+		player:hud_set_hotbar_selected_image(img)
+	end
+end
 
 local function pause_game(player, balloon, won)
 	p_set(player, "status", "paused")
@@ -954,6 +957,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 	end
 
 	update_score_hud(player)
+	update_hotbar(player)
 end
 
 minetest.register_entity(prefix .. "balloon", {

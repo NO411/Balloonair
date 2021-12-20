@@ -392,6 +392,12 @@ local function add_explosion(amount, player, balloon)
 	play_sound("explosion", player)
 end
 
+local hotbar_items = {
+	gasbottle = 1,
+	shield_coin = 2,
+	sandbag = 3,
+}
+
 local function pause_game(player, balloon, won)
 	p_set(player, "status", "paused")
 	if set_highscore(player) or won then
@@ -433,9 +439,9 @@ local function pause_game(player, balloon, won)
 	end
 
 	local inv = player:get_inventory()
-	inv:set_stack("main", 1, {name = prefix .. "gasbottle_item", count = 1})
-	inv:set_stack("main", 2, {name = prefix .. "shield_coin_item", count = 1})
-	inv:set_stack("main", 3, {name = prefix .. "sandbag_item", count = 2})
+	for item, n in pairs(hotbar_items) do
+		inv:set_stack("main", n, {name = prefix .. item .. "_item", count = math.ceil(n / 2)})
+	end
 
 	local b_ent = balloon:get_luaentity()
 	b_ent._speed = 0
@@ -645,6 +651,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 	local status = p_get(player, "status")
 	local balloon_pos = balloon:get_pos()
 	local hud = p_get(player, "hud")
+	local inv = player:get_inventory()
 	local rotation = balloon:get_rotation()
 
 
@@ -862,7 +869,8 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 							end
 						end
 					elseif ename == prefix .. "sandbag" or ename == prefix .. "gasbottle" or ename == prefix .. "shield_coin" then
-						player:get_inventory():add_item("main", {name = ename .. "_item"})
+						local n = hotbar_items[string.sub(ename, string.len(prefix) + 1)]
+						inv:set_stack("main", n, {name = ename .. "_item", count = inv:get_stack("main", n):get_count() + 1})
 					end
 					obj:move_to(balloon_pos)
 					obj:remove()

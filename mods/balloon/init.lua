@@ -258,10 +258,10 @@ local function set_environment(player)
 	})
 	player:override_day_night_ratio(0.7)
 	player:set_inventory_formspec(
-		"formspec_version[4]"..
+		"formspec_version[4]" ..
 		"size[10, 10]" ..
-		"bgcolor[#00000000;both;#00000000]"..
-		"background[0,0;10,10;balloon_hud_boost_board.png^[colorize:#" .. colors[13] ..":200;true;10]"..
+		"bgcolor[#00000000;both;#00000000]" ..
+		"background[0,0;10,10;balloon_hud_boost_board.png^[colorize:#" .. colors[13] .. ":200;true;10]" ..
 		"label[0.5,0.5;Controls:\n\n" ..
 		"- Down: lower the balloon\n" ..
 		"- Left: move the balloon to the left\n" ..
@@ -282,7 +282,8 @@ local function reset_pos(balloon)
 			break
 		end
 	end
-	balloon:move_to(vector.new(0, 100, 50 * n_player - 50))
+	local pos = vector.new(0, 100, 50 * n_player - 50)
+	balloon:move_to(pos)
 	balloon:set_velocity(vector.new(0, 0, 0))
 end
 
@@ -333,16 +334,12 @@ end
 
 local function remove_gas_drive(b_ent)
 	b_ent._gas_drive = false
-	b_ent._gasbottle:set_properties({
-		is_visible = false
-	})
+	b_ent._gasbottle:set_properties({is_visible = false})
 end
 
 local function remove_bird_drive(b_ent)
 	b_ent._bird_drive = false
-	b_ent.object:set_properties({
-		automatic_rotate = 0.1,
-	})
+	b_ent.object:set_properties({automatic_rotate = 0.1})
 end
 
 local function update_boost_board(player, effect)
@@ -351,14 +348,14 @@ end
 
 local function remove_shield_drive(b_ent)
 	b_ent._shield_drive = false
-	b_ent.object:set_properties({
-		physical = true,
-	})
+	b_ent.object:set_properties({physical = true})
+
 	local player = b_ent._balloonist
 	if p_get(player, "hud").boosts.counters[6] then
 		remove_hud(player, "boosts", "counters", 6)
 		remove_hud(player, "boosts", "images", 6)
 	end
+
 	update_boost_board(player, "")
 end
 
@@ -367,16 +364,12 @@ local function remove_sand_drive(b_ent, all, sandbag, i)
 		b_ent._sand_drives = {false, false, false, false}
 		b_ent._sand_drive = 0
 		for _, obj in pairs(b_ent._sandbags) do
-			obj:set_properties({
-				is_visible = false,
-			})
+			obj:set_properties({is_visible = false})
 		end
 	elseif sandbag then
 		b_ent._sand_drive = b_ent._sand_drive - 1
 		b_ent._sand_drives[i] = false
-		sandbag:set_properties({
-			is_visible = false,
-		})
+		sandbag:set_properties({is_visible = false})
 	end
 end
 
@@ -401,11 +394,6 @@ end
 
 local function pause_game(player, balloon, won)
 	p_set(player, "status", "paused")
-	minetest.after(0.01, function()
-		if p_get(player, "status") == "paused" then
-			add_paused_screen(player)
-		end
-	end)
 	if set_highscore(player) or won then
 		local highscore = p_get(player, "highscore")
 		if not p_get(player, "hud").new_highscore then
@@ -443,7 +431,6 @@ local function pause_game(player, balloon, won)
 			player:hud_change(p_get(player, "hud").new_highscore[1], "text", highscore)
 		end
 	end
-	reset_pos(balloon)
 
 	local inv = player:get_inventory()
 	inv:set_stack("main", 1, {name = prefix .. "gasbottle_item", count = 1})
@@ -478,10 +465,14 @@ local function pause_game(player, balloon, won)
 		end
 	end
 
-	balloon:set_properties({
-		physical = false,
-	})
+	balloon:set_properties({physical = false})
 	balloon:set_rotation(vector.new(0, 0, 0))
+	reset_pos(balloon)
+	minetest.after(0.01, function()
+		if p_get(player, "status") == "paused" then
+			add_paused_screen(player)
+		end
+	end)
 end
 
 local function add_boost_hud(player, i, image)
@@ -523,9 +514,7 @@ minetest.register_craftitem(prefix .. "gasbottle_item", {
 			b_ent._gas_drive = true
 			itemstack:take_item()
 			local gasbottle = b_ent._gasbottle
-			gasbottle:set_properties({
-				is_visible = true
-			})
+			gasbottle:set_properties({is_visible = true})
 			add_boost_hud(user, 1, "gasbottle")
 			play_sound("gas", user)
 		end
@@ -543,9 +532,7 @@ minetest.register_craftitem(prefix .. "shield_coin_item", {
 			itemstack:take_item()
 			add_boost_hud(user, 6, "shield")
 			update_boost_board(user, "_shield")
-			balloon:set_properties({
-				physical = false,
-			})
+			balloon:set_properties({physical = false})
 			play_sound("use_shield", user)
 		end
 		return itemstack
@@ -561,9 +548,7 @@ minetest.register_craftitem(prefix .. "sandbag_item", {
 			b_ent._sand_drive = b_ent._sand_drive + 1
 			for i, drive in pairs(b_ent._sand_drives) do
 				if not drive then
-					b_ent._sandbags[i]:set_properties({
-						is_visible = true,
-					})
+					b_ent._sandbags[i]:set_properties({is_visible = true})
 					b_ent._sand_drives[i] = true
 					add_boost_hud(user, i + 1, "sandbag")
 					break
@@ -635,9 +620,7 @@ register_spawn_entity("shield_coin", 15, "balloon_shield_coin.png", 0.05, 10, tr
 
 register_spawn_entity("bird", 10, "", 0.3, false, true, {
 	on_activate = function(self)
-		self.object:set_properties({
-			textures = {color_to_texture(random_color())},
-		})
+		self.object:set_properties({textures = {color_to_texture(random_color())}})
 		self.object:set_velocity(vector.new(-40, 0, 0))
 	end
 })
@@ -751,11 +734,15 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			end
 		end
 
+		if self._gas_drive or sand_drive > 0 then
+			balloon:set_pos(balloon:get_pos())
+		end
+
 		if self._gas_drive then
 			for i = 1, 2 do
 				minetest.add_particle({
 					pos = vector.offset(balloon:get_pos(), math.random(-15, 15) / 100, 0.6, math.random(-15, 15) / 100),
-					velocity = vector.offset(balloon:get_velocity(), -0.3, 3, 0),
+					velocity = vector.offset(balloon:get_velocity(), 0, 3, 0),
 					expirationtime = 0.3,
 					size = math.random(1, 10) / 20,
 					texture = color_to_texture(math.random(1, 4)),
@@ -777,10 +764,10 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 		end
 
 		if sand_drive > 0 then
-			for i = 1, sand_drive do
+			for i = 1, math.ceil(sand_drive / 2) do
 				minetest.add_particle({
 					pos = vector.offset(balloon:get_pos(), math.random(-20, 20) / 100, balloon_scale / 2 - 2, math.random(-20, 20) / 100),
-					velocity = vector.offset(balloon:get_velocity(), math.random(-5, 5) / 10, -1, math.random(-5, 5) / 10),
+					velocity = vector.offset(balloon:get_velocity(), math.random(-5, 5) / 10, -2, math.random(-5, 5) / 10),
 					expirationtime = 1,
 					size = math.random(1, 10) / 15,
 					texture = color_to_texture(table_random({1, 6, 15, 16})),
@@ -839,9 +826,7 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 						if not self._shield_drive then
 							play_sound("sink", player)
 							self._bird_drive = true
-							balloon:set_properties({
-								automatic_rotate = 5,
-							})
+							balloon:set_properties({automatic_rotate = 5})
 							timers.bird = 0
 						else
 							remove_shield_drive(self)
@@ -895,16 +880,12 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 		end
 
 		if not self._shield_drive and balloon_pos.x >= 60 and not balloon:get_properties().physical and minetest.get_node(balloon_pos).name == "air" then
-			self.object:set_properties({
-				physical = true,
-			})
+			self.object:set_properties({physical = true})
 		elseif moveresult and not self._shield_drive then
 			for _, collision in pairs(moveresult.collisions) do
 				if minetest.get_node(collision.node_pos).name ~= "" then
 					p_set(player, "status", "counting")
-					balloon:set_properties({
-						automatic_rotate = 0,
-					})
+					balloon:set_properties({automatic_rotate = 0})
 					break
 				end
 			end

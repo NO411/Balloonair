@@ -13,7 +13,7 @@ Everything (sounds, textures, models, code) was created by NO11 in these 21 days
 
 The goal of the game is to get the highest score. The score consists of the position of your balloon and the coins you collected.
 Try not to sink down!
-You can play this game on a server with other players. You can see the scores of all players who have been on the server by running `/ scores`.
+You can play this game on a server with other players. You can see the scores of all players who have been on the server by running `/scores`.
 
 
 ### Gameplay

@@ -1,5 +1,6 @@
 local minetest, math, vector, pairs, table = minetest, math, vector, pairs, table
 local modname = minetest.get_current_modname()
+local storage = minetest.get_mod_storage()
 
 minetest.settings:set("time_speed", 0)
 
@@ -305,7 +306,7 @@ local function set_highscore(player)
 	end
 	p_set(player, "score", 0)
 	p_set(player, "coin_points", 0)
-	player:get_meta():set_int("highscore", p_get(player, "highscore"))
+	storage:set_int(player:get_player_name() .. ":highscore", p_get(player, "highscore"))
 	return ret
 end
 
@@ -1030,7 +1031,7 @@ minetest.register_on_joinplayer(function(player)
 		score = 0,
 		coin_points = 0,
 		counting = 5,
-		highscore = player:get_meta():get_int("highscore"),
+		highscore = storage:get_int(player:get_player_name()),
 		balloon = nil,
 		boosts = {0, 0, 0, 0, 0, 0},
 		timers = {
@@ -1104,8 +1105,10 @@ minetest.register_chatcommand("scores", {
 	description = "Get the highscore of all online players",
 	func = function(name, param)
 		local str = ""
-		for player, _ in pairs(players) do
-			str = str .. player:get_player_name() .. ": " .. p_get(player, "highscore") .. "\n"
+		for key, value in pairs(storage:to_table().fields) do
+			if string.match(key, ":highscore") then
+				str = str .. string.sub(key, 1, -11) .. ": " .. value .. "\n"
+			end
 		end
 		minetest.chat_send_player(name, minetest.colorize("#" .. colors[13], string.sub(str, 1, -2)))
 	end

@@ -1,6 +1,9 @@
 # Balloonair
 ## by NO11
 
+[![ContentDB](https://content.minetest.net/packages/NO11/balloonair/shields/title/)](https://content.minetest.net/packages/NO11/balloonair/)
+[![ContentDB](https://content.minetest.net/packages/NO11/balloonair/shields/downloads/)](https://content.minetest.net/packages/NO11/balloonair/)
+
 A hot air balloon game for Minetest.
 
 ![screenshot](https://github.com/NO411/Balloonair/blob/main/screenshot.png)

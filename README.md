@@ -6,20 +6,21 @@
 
 A hot air balloon game for Minetest.
 
-![screenshot](https://github.com/NO411/Balloonair/blob/main/screenshot.png)
+![screenshot](https://raw.githubusercontent.com/NO411/Balloonair/main/screenshot.png)
 
-This game was created in 21 days for the 2021 Minetest GAME JAM.
-Everything (sounds, textures, models, code) was created by NO11 in these 21 days and is under the GPL 3.0 license.
+This game was created during 21 days for the 2021 Minetest GAME JAM.
+Everything (sounds, textures, models, code) was created by NO11 in these 21 days and it is under the GPL 3.0 license.
 
-The goal of the game is to get the highest score. The score is made up of the position of your balloon and the coins you have collected.
+The goal of the game is to get the highest score. The score consists of the position of your balloon and the coins you collected.
 Try not to sink down!
 You can play this game on a server with other players. You can see the scores of all players who have been on the server by running `/ scores`.
 
-##### Gameplay
+
+### Gameplay
 
 Control a balloon and fly as far towards the sun as you can.
 
-There are 3 items that you can collect:
+There are 3 items which you can collect:
 
 * Gas bottle: drive forward faster
 * Sandbag: you can activate a total of 4, the balloon rises because it is losing weight
@@ -32,9 +33,10 @@ Do not worry if everything you see is black in the beginning! Then you spawned i
 
 While trying not to sink, enjoy the beautiful randomly generated landscape!
 
-##### Controls
 
-Where you move the mouse doesn't affect where you fly, you always fly in the direction of the sun and can only steer right, left, up and down!
+### Controls
+
+Where you move the mouse doesn't affect where you fly, you always fly in the direction of the sun and you can only steer right, left, up and down!
 
 * Down: lower the balloon
 * Left: move the balloon to the left
@@ -48,3 +50,5 @@ At the moment there are no global variables/functions, it is standalone.
 If it gets enough positive feedback, maybe I'll create a modding API.
 
 The game supports the current stable Minetest version 5.4.1, but with the 5.5-dev you have an even better gaming experience!
+
+*Have fun with my game and enjoy your flight, NO11!*

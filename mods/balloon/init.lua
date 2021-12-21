@@ -13,7 +13,7 @@ local colors = {
 	"4B3D44",
 	"BA9158",
 	"927441",
-	"4d4539",
+	"4D4539",
 	"77743B",
 	"B3A555",
 	"D2C9A5",
@@ -81,7 +81,7 @@ local function get_tree_schematic(_, t, l)
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
-	
+
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
@@ -92,7 +92,7 @@ local function get_tree_schematic(_, t, l)
 		_, _, _, l, _, _, _,
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
-	
+
 		_, _, _, t, _, _, _,
 		_, _, _, t, _, _, _,
 		_, _, _, t, _, _, _,
@@ -103,7 +103,7 @@ local function get_tree_schematic(_, t, l)
 		_, l, l, l, l, l, _,
 		_, _, l, l, l, _, _,
 		_, _, _, l, _, _, _,
-	
+
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
@@ -114,7 +114,7 @@ local function get_tree_schematic(_, t, l)
 		_, _, l, l, l, _, _,
 		_, _, _, l, _, _, _,
 		_, _, _, _, _, _, _,
-	
+
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
@@ -125,7 +125,7 @@ local function get_tree_schematic(_, t, l)
 		_, _, l, l, l, _, _,
 		_, _, _, l, _, _, _,
 		_, _, _, _, _, _, _,
-	
+
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
 		_, _, _, _, _, _, _,
@@ -257,7 +257,7 @@ local function set_environment(player)
 	player:set_inventory_formspec(
 		"formspec_version[4]" ..
 		"size[10, 10]" ..
-		"bgcolor[#00000000;both;#00000000]" ..
+		"bgcolor[#00000000]" ..
 		"background[0,0;10,10;balloon_hud_boost_board.png^[colorize:#" .. colors[13] .. ":200;true;10]" ..
 		"label[0.5,0.5;Controls:\n\n" ..
 		"- Down: lower the balloon\n" ..
@@ -283,7 +283,6 @@ local function reset_pos(balloon)
 	balloon:move_to(pos)
 	balloon:set_velocity(vector.new(0, 0, 0))
 end
-
 
 local function add_paused_screen(player)
 	p_get(player, "hud").paused = player:hud_add({
@@ -470,7 +469,7 @@ local function pause_game(player, balloon, won)
 	end
 
 	for i = 2, 5 do
-		if boost_hud.counters[i]  then
+		if boost_hud.counters[i] then
 			remove_hud(player, "boosts", "counters", i)
 		end
 	end
@@ -510,9 +509,10 @@ local function add_boost_hud(player, i, image)
 end
 
 local function can_activate_boost(balloon, b_ent, drive, player)
+	local drive = "_" .. drive .. "_drive"
 	return balloon and b_ent and
 	p_get(player, "status") == "running" and
-	((type(b_ent["_" .. drive .. "_drive"]) == "number" and b_ent["_" .. drive .. "_drive"] < 4) or not b_ent["_" .. drive .. "_drive"])
+	((type(b_ent[drive]) == "number" and b_ent[drive] < 4) or not b_ent[drive])
 end
 
 minetest.register_craftitem(prefix .. "gasbottle_item", {
@@ -522,9 +522,8 @@ minetest.register_craftitem(prefix .. "gasbottle_item", {
 		local b_ent = balloon:get_luaentity()
 		if can_activate_boost(balloon, b_ent, "gas", user) then
 			b_ent._gas_drive = true
+			b_ent._gasbottle:set_properties({is_visible = true})
 			itemstack:take_item()
-			local gasbottle = b_ent._gasbottle
-			gasbottle:set_properties({is_visible = true})
 			add_boost_hud(user, 1, "gasbottle")
 			play_sound("gas", user)
 		end
@@ -621,7 +620,7 @@ local function register_spawn_entity(name, scale, texture, probability, rotation
 	else
 		properties.initial_properties.is_visible = false
 	end
-	
+
 	minetest.register_entity(ent_name, properties)
 end
 
@@ -697,8 +696,8 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 			end
 
 			for i = 2, 5 do
-				local sandbag = self._sandbags[i - 1]
 				if self._sand_drives[i - 1] then
+					local sandbag = self._sandbags[i - 1]
 					local sand_seconds = boosts[i]
 					if sand_seconds == 0 then
 						remove_hud(player, "boosts", "counters", i)
@@ -1031,7 +1030,7 @@ minetest.register_on_joinplayer(function(player)
 		score = 0,
 		coin_points = 0,
 		counting = 5,
-		highscore = storage:get_int(player:get_player_name()),
+		highscore = storage:get_int(player:get_player_name() .. ":highscore"),
 		balloon = nil,
 		boosts = {0, 0, 0, 0, 0, 0},
 		timers = {

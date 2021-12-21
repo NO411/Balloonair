@@ -384,7 +384,7 @@ local function add_explosion(amount, player, balloon)
 			minsize = 1,
 			maxsize = 5,
 			texture = color_to_texture(i),
-			playername = player_name,
+			playername = player:get_player_name(),
 		})
 	end
 	play_sound("explosion", player)

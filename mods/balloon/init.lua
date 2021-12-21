@@ -673,45 +673,43 @@ local function main_loop(self, balloon, player, timers, moveresult, dtime)
 		end
 
 		local sand_drive = self._sand_drive
-		if timers.seconds >= 1 then
-			local boost_hud = hud.boosts
-			if self._gas_drive then
-				local gas_seconds = boosts[1]
-				if gas_seconds == 0 then
-					remove_gas_drive(self)
-					remove_hud(player, "boosts", "counters", 1)
-					remove_hud(player, "boosts", "images", 1)
+		local boost_hud = hud.boosts
+		if self._gas_drive and timers.boosts[1] >= 1 then
+			local gas_seconds = boosts[1]
+			if gas_seconds == 0 then
+				remove_gas_drive(self)
+				remove_hud(player, "boosts", "counters", 1)
+				remove_hud(player, "boosts", "images", 1)
+			else
+				player:hud_change(boost_hud.counters[1], "text", gas_seconds)
+				boosts[1] = gas_seconds - 1
+			end
+			timers.boosts[1] = 0
+		end
+		if self._shield_drive and timers.boosts[6] >= 1 then
+			local shield_seconds = boosts[6]
+			if shield_seconds == 0 then
+				remove_shield_drive(self)
+			else
+				player:hud_change(boost_hud.counters[6], "text", shield_seconds)
+				boosts[6] = shield_seconds - 1
+			end
+			timers.boosts[6] = 0
+		end
+		for i = 2, 5 do
+			if self._sand_drives[i - 1] and timers.boosts[i] >= 1 then
+				local sandbag = self._sandbags[i - 1]
+				local sand_seconds = boosts[i]
+				if sand_seconds == 0 then
+					remove_hud(player, "boosts", "counters", i)
+					remove_hud(player, "boosts", "images", i)
+					remove_sand_drive(self, false, sandbag, i - 1)
 				else
-					player:hud_change(boost_hud.counters[1], "text", gas_seconds)
-					boosts[1] = gas_seconds - 1
+					player:hud_change(boost_hud.counters[i], "text", sand_seconds)
+					boosts[i] = sand_seconds - 1
 				end
+				timers.boosts[i] = 0
 			end
-
-			if self._shield_drive then
-				local shield_seconds = boosts[6]
-				if shield_seconds == 0 then
-					remove_shield_drive(self)
-				else
-					player:hud_change(boost_hud.counters[6], "text", shield_seconds)
-					boosts[6] = shield_seconds - 1
-				end
-			end
-
-			for i = 2, 5 do
-				if self._sand_drives[i - 1] then
-					local sandbag = self._sandbags[i - 1]
-					local sand_seconds = boosts[i]
-					if sand_seconds == 0 then
-						remove_hud(player, "boosts", "counters", i)
-						remove_hud(player, "boosts", "images", i)
-						remove_sand_drive(self, false, sandbag, i - 1)
-					else
-						player:hud_change(boost_hud.counters[i], "text", sand_seconds)
-						boosts[i] = sand_seconds - 1
-					end
-				end
-			end
-			timers.seconds = 0
 		end
 
 		if timers.bird >= 1.5 and self._bird_drive then
@@ -995,8 +993,14 @@ minetest.register_entity(prefix .. "balloon", {
 		if player and players[player] then
 
 			local timers = p_get(player, "timers")
-			for n, _ in pairs(timers) do
-				timers[n] = timers[n] + dtime
+			for name, value in pairs(timers) do
+				if type(value) == "number" then
+					timers[name] = value + dtime
+				else
+					for n, v in pairs(value) do
+						timers[name][n] = v + dtime
+					end
+				end
 			end
 
 			main_loop(self, balloon, player, timers, moveresult, dtime)
@@ -1042,9 +1046,9 @@ minetest.register_on_joinplayer(function(player)
 			counter = 0,
 			spawn_objects = 0,
 			change_spawn_pos = 0,
-			seconds = 0,
 			bird = 0,
 			new_highscore = 0,
+			boosts = {0, 0, 0, 0, 0, 0},
 		},
 		hud = {
 			overlay = player:hud_add({

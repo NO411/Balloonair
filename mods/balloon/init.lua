@@ -264,7 +264,7 @@ local function set_environment(player)
 		"label[0.5,0.5;Controls:\n\n" ..
 		"- Down: lower the balloon\n" ..
 		"- Left: move the balloon to the left\n" ..
-		"- Right: move the balloon to the rigth\n" ..
+		"- Right: move the balloon to the right\n" ..
 		"- Jump: start game\n" ..
 		"- Aux1: abort game\n" ..
 		"- Dig: use the selected item\n" ..

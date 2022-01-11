@@ -1107,7 +1107,7 @@ for _, mg_alias in pairs(mapgen_aliases) do
 end
 
 minetest.register_chatcommand("scores", {
-	description = "Get the highscore of all online players",
+	description = "Get the highscore of all players",
 	func = function(name, param)
 		local str = ""
 		for key, value in pairs(storage:to_table().fields) do
